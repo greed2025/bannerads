@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シナリオ作成</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="scenario.css">
+</head>
+<body>
+    <div class="scenario-tool">
+        <!-- ヘッダー -->
+        <header class="tool-header">
+            <div class="header-left">
+                <h1 class="tool-title">シナリオ作成</h1>
+                <span class="scenario-count" id="scenarioCount">0件</span>
+            </div>
+
+        </header>
+
+        <!-- タブバー -->
+        <div class="tab-bar">
+            <div class="tabs-container" id="tabsContainer">
+                <button class="tab active" data-project-id="1">
+                    <span class="tab-name">シナリオ 1</span>
+                    <button class="tab-close" data-project-id="1">×</button>
+                </button>
+            </div>
+            <button class="new-tab-btn" id="newTabBtn" title="新規シナリオ">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- メインエリア -->
+        <div class="tool-main">
+            <!-- 左: 好調シナリオ選択パネル -->
+            <aside class="scenario-panel">
+                <div class="panel-header">
+                    <h2>好調シナリオ</h2>
+                    <button class="add-scenario-btn" id="addScenarioBtn" title="新規登録">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="panel-select-row">
+                    <select class="project-select" id="projectSelectLeft">
+                        <option value="debt">債務整理</option>
+                        <option value="unemployment">失業保険</option>
+                        <option value="clinic">クリニック</option>
+                    </select>
+                </div>
+                <div class="scenario-list" id="scenarioList">
+                    <!-- 動的に生成 -->
+                </div>
+            </aside>
+
+            <!-- 中央: シナリオ表示エリア -->
+            <main class="content-area">
+                <!-- マーカーツールバー -->
+                <div class="marker-tools" id="markerTools">
+                    <div class="marker-tools-left">
+                        <div class="marker-tool-group">
+                            <button class="marker-tool-btn" id="greenMarkerTool" title="緑マーカー（単発修正）">
+                                <span class="marker-dot green"></span>
+                            </button>
+                            <button class="marker-tool-btn" id="redMarkerTool" title="赤マーカー（永続修正）">
+                                <span class="marker-dot red"></span>
+                            </button>
+                            <span class="marker-count-badge" id="markerCount">0</span>
+                        </div>
+                        <div class="marker-tool-divider"></div>
+                        <button class="marker-tool-btn preview-btn" id="previewMarkerTool" title="修正プレビュー">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                <line x1="16" y1="17" x2="8" y2="17"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="marker-tools-right">
+                        <button class="marker-clear-btn" id="clearMarkers" title="クリア">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="scenario-display" id="scenarioDisplay">
+                    <div class="empty-state">
+                        <div class="empty-icon">📝</div>
+                        <p>右側のチャットでシナリオを作成しましょう</p>
+                    </div>
+                </div>
+                
+                <!-- マーカープレビューパネル - モダンスライドイン -->
+                <div class="marker-preview-panel" id="markerPreviewPanel">
+                    <div class="marker-preview-header">
+                        <div class="marker-preview-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                            <span>修正プレビュー</span>
+                            <span class="marker-preview-badge" id="markerPreviewBadge">0</span>
+                        </div>
+                        <button class="marker-preview-close" id="markerPreviewClose">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="marker-preview-body">
+                        <div class="marker-preview-list" id="markerPreviewList">
+                            <!-- マーカーが動的に生成される -->
+                        </div>
+                    </div>
+                    <div class="marker-preview-footer">
+                        <button class="marker-preview-clear-btn" id="markerPreviewClearBtn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            すべてクリア
+                        </button>
+                        <button class="marker-preview-apply-btn" id="markerPreviewApplyBtn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            修正を適用
+                        </button>
+                    </div>
+                </div>
+            </main>
+
+            <!-- 右: チャットパネル -->
+            <aside class="chat-panel">
+                <!-- 事前設定パネル -->
+                <div class="preset-panel collapsed">
+                    <div class="preset-header">
+                        <span class="preset-title">任意設定</span>
+                        <button class="preset-toggle" id="presetToggle" title="パネルを開閉">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6,9 12,15 18,9"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="preset-content" id="presetContent">
+                        <div class="preset-row">
+                            <label class="preset-label">ターゲット</label>
+                            <input type="text" class="preset-input" id="presetTarget" placeholder="例: 30代男性、借金に悩む会社員">
+                        </div>
+                        <div class="preset-row">
+                            <label class="preset-label">訴求軸</label>
+                            <input type="text" class="preset-input" id="presetAppeal" placeholder="例: 無料相談、スピード対応">
+                        </div>
+                        <div class="preset-row">
+                            <label class="preset-label">詳細</label>
+                            <textarea class="preset-textarea" id="presetDetails" placeholder="例: 体験談形式で、具体的な数字を入れる"></textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chat-messages" id="chatMessages">
+                    <div class="chat-message system">
+                        <div class="message-content">
+                            <p>👋 どんなシナリオを作成しますか？</p>
+                            <p class="hint">左パネルから好調シナリオを選択すると、参考にして作成します。</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <input type="file" id="referenceInput" accept="image/*" multiple hidden>
+                    <div class="chat-image-previews" id="uploadPreviews"></div>
+                    <div class="input-options">
+                        <label class="option-label">
+                            <select id="projectSelectChat">
+                                <option value="debt" selected>債務整理</option>
+                                <option value="unemployment">失業保険</option>
+                                <option value="clinic">クリニック</option>
+                            </select>
+                        </label>
+                        <label class="option-label">
+                            <select id="generationCount">
+                                <option value="1" selected>1件</option>
+                                <option value="2">2件</option>
+                                <option value="3">3件</option>
+                                <option value="4">4件</option>
+                                <option value="5">5件</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="input-row">
+                        <button class="attach-btn" id="attachBtn" title="画像を添付">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                            </svg>
+                        </button>
+                        <textarea class="chat-input" id="chatInput"></textarea>
+                        <button class="chat-send-btn" id="chatSendBtn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"/>
+                                <polygon points="22,2 15,22 11,13 2,9"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- シナリオ保存モーダル -->
+        <div class="modal" id="saveModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>好調シナリオを保存</h3>
+                    <button class="modal-close" id="saveModalClose">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="scenarioFileName">ファイル名</label>
+                        <input type="text" id="scenarioFileName" placeholder="例: 債務整理_成功パターン">
+                    </div>
+                    
+                    <!-- 動画アップロード機能（折りたたみ式） -->
+                    <div class="form-group video-upload-group">
+                        <div class="video-upload-header" id="videoUploadHeader">
+                            <span class="video-upload-label">動画から文字起こし（任意）</span>
+                            <svg class="video-upload-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6,9 12,15 18,9"/>
+                            </svg>
+                        </div>
+                        <div class="video-upload-content" id="videoUploadContent" style="display: none;">
+                            <div class="video-upload-area" id="videoUploadArea">
+                                <input type="file" id="videoInput" accept="video/*,audio/*" hidden>
+                                <div class="upload-placeholder" id="uploadPlaceholder">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polygon points="23 7 16 12 23 17 23 7"/>
+                                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                                    </svg>
+                                    <span>クリックして動画/音声を選択</span>
+                                    <span class="upload-hint">MP4, MOV, MP3, WAV対応（最大100MB）</span>
+                                </div>
+                                <div class="upload-progress" id="uploadProgress" style="display: none;">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="progressFill"></div>
+                                    </div>
+                                    <span class="progress-text" id="progressText">文字起こし中...</span>
+                                </div>
+                                <div class="upload-result" id="uploadResult" style="display: none;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                        <polyline points="22 4 12 14.01 9 11.01"/>
+                                    </svg>
+                                    <span id="uploadResultText">文字起こし完了</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="scenarioContent">シナリオ本文</label>
+                        <textarea id="scenarioContent" rows="10" placeholder="シナリオの内容を入力..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="saveModalCancel">キャンセル</button>
+                    <button class="btn btn-primary" id="saveModalConfirm">保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 編集モーダル -->
+        <div class="modal" id="editModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>好調シナリオを編集</h3>
+                    <button class="modal-close" id="editModalClose">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="editScenarioFileName">ファイル名</label>
+                        <input type="text" id="editScenarioFileName" placeholder="例: 債務整理_成功パターン">
+                        <input type="hidden" id="editOriginalFileName">
+                    </div>
+                    <div class="form-group">
+                        <label for="editScenarioContent">シナリオ本文</label>
+                        <textarea id="editScenarioContent" rows="10" placeholder="シナリオの内容を入力..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="editModalCancel">キャンセル</button>
+                    <button class="btn btn-primary" id="editModalConfirm">更新</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 削除確認モーダル -->
+        <div class="modal" id="deleteModal">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h3>シナリオを削除</h3>
+                    <button class="modal-close" id="deleteModalClose">×</button>
+                </div>
+                <div class="modal-body">
+                    <p>「<span id="deleteScenarioName"></span>」を削除しますか？</p>
+                    <p class="delete-warning">この操作は取り消せません。</p>
+                    <input type="hidden" id="deleteScenarioFilename">
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="deleteModalCancel">キャンセル</button>
+                    <button class="btn btn-danger" id="deleteModalConfirm">削除</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="scenario.js"></script>
+</body>
+</html>
+

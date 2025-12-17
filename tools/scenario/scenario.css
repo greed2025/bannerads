@@ -1,0 +1,2209 @@
+/* ========================================
+   シナリオ作成ツール - スタイル
+   ======================================== */
+
+/* CSS変数 */
+:root {
+    --color-white: #ffffff;
+    --color-gray-50: #fafafa;
+    --color-gray-100: #f5f5f5;
+    --color-gray-200: #e5e5e5;
+    --color-gray-300: #d4d4d4;
+    --color-gray-400: #a3a3a3;
+    --color-gray-500: #737373;
+    --color-gray-600: #525252;
+    --color-gray-700: #404040;
+    --color-gray-800: #262626;
+    --color-gray-900: #171717;
+    
+    --color-accent: #6366f1;
+    --color-accent-light: #818cf8;
+    --color-success: #22c55e;
+    --color-warning: #f59e0b;
+    --color-danger: #ef4444;
+    
+    --border-color: rgba(0, 0, 0, 0.08);
+    
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    
+    --transition-fast: 150ms ease;
+    --transition-normal: 250ms ease;
+    
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    
+    --chat-width: 450px;
+    --scenario-panel-width: 280px;
+    --header-height: 56px;
+}
+
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-family);
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--color-gray-800);
+    background: var(--color-gray-50);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ========================================
+   メインレイアウト
+   ======================================== */
+
+.scenario-tool {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ========================================
+   ヘッダー
+   ======================================== */
+
+.tool-header {
+    height: var(--header-height);
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--color-white);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.tool-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-gray-900);
+}
+
+.scenario-count {
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-gray-500);
+    background: var(--color-gray-100);
+    border-radius: 100px;
+}
+
+
+
+/* ========================================
+   タブバー
+   ======================================== */
+
+.tab-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 20px;
+    background: var(--color-white);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.tabs-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    overflow-x: auto;
+}
+
+.tabs-container::-webkit-scrollbar {
+    display: none;
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-gray-600);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.tab:hover {
+    background: var(--color-gray-50);
+}
+
+.tab.active {
+    background: var(--color-gray-100);
+    border-color: var(--border-color);
+    color: var(--color-gray-900);
+}
+
+.tab-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tab-name-input {
+    width: 100px;
+    padding: 2px 4px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--color-accent);
+    border-radius: 3px;
+    outline: none;
+    background: var(--color-white);
+}
+
+.tab-close {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--color-gray-400);
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    padding: 0;
+}
+
+.tab-close:hover {
+    background: var(--color-gray-200);
+    color: var(--color-gray-700);
+}
+
+.tab.active .tab-close:hover {
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+.new-tab-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--color-gray-500);
+    border: 1px dashed var(--color-gray-300);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.new-tab-btn:hover {
+    background: var(--color-accent);
+    color: white;
+    border-color: var(--color-accent);
+}
+
+/* ========================================
+   メインエリア
+   ======================================== */
+
+.tool-main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+/* ========================================
+   好調シナリオパネル（左）
+   ======================================== */
+
+.scenario-panel {
+    width: var(--scenario-panel-width);
+    display: flex;
+    flex-direction: column;
+    background: var(--color-white);
+    border-right: 1px solid var(--border-color);
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.panel-header h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-gray-800);
+}
+
+.add-scenario-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-gray-100);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--color-gray-600);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.add-scenario-btn:hover {
+    background: var(--color-accent);
+    color: white;
+}
+
+.panel-select-row {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-gray-100);
+}
+
+.project-select,
+.model-select {
+    width: auto;
+    min-width: 120px;
+    padding: 8px 12px;
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-sm);
+    background: white;
+    font-size: 13px;
+    color: var(--color-gray-700);
+    cursor: pointer;
+    transition: border-color var(--transition-fast);
+}
+
+.project-select:hover,
+.model-select:hover {
+    border-color: var(--color-primary);
+}
+
+.project-select:focus,
+.model-select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.chat-header {
+    padding: 12px;
+    border-bottom: 1px solid var(--color-gray-100);
+    background: var(--color-gray-50);
+}
+
+.chat-selects {
+    display: flex;
+    gap: 8px;
+}
+
+.chat-selects .project-select,
+.chat-selects .model-select {
+    flex: 1;
+}
+
+.scenario-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.scenario-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    background: var(--color-gray-50);
+    border: 2px solid transparent;
+    margin-bottom: 8px;
+}
+
+.scenario-item:hover {
+    background: var(--color-gray-100);
+    border-color: var(--color-gray-200);
+}
+
+.scenario-item.selected {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: var(--color-primary);
+}
+
+.scenario-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    margin-top: 2px;
+    cursor: pointer;
+    accent-color: var(--color-primary);
+}
+
+.scenario-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.scenario-item-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-gray-800);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.scenario-item-preview {
+    font-size: 11px;
+    color: var(--color-gray-500);
+    margin-top: 2px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.scenario-empty {
+    padding: 20px;
+    text-align: center;
+    color: var(--color-gray-400);
+    font-size: 12px;
+}
+
+/* ========================================
+   コンテンツエリア（中央）
+   ======================================== */
+
+.content-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--color-gray-50);
+    position: relative;
+}
+
+/* マーカーツールバー */
+.marker-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.marker-tools-left,
+.marker-tools-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.marker-tool-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--color-gray-100);
+    padding: 4px;
+    border-radius: var(--radius-md);
+}
+
+.marker-tool-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border-color);
+    margin: 0 4px;
+}
+
+.marker-tool-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border: 2px solid transparent;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-gray-600);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.marker-tool-btn:hover {
+    background: var(--color-white);
+}
+
+.marker-tool-btn.active {
+    background: var(--color-white);
+    border-color: var(--color-accent);
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
+}
+
+.marker-tool-btn.active .marker-dot.green {
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.8);
+}
+
+.marker-tool-btn.active .marker-dot.red {
+    box-shadow: 0 0 8px rgba(248, 113, 113, 0.8);
+}
+
+.marker-tool-btn.preview-btn {
+    width: 36px;
+    height: 36px;
+    background: var(--color-gray-50);
+    border: 1px solid var(--border-color);
+}
+
+.marker-tool-btn.preview-btn:hover {
+    background: var(--color-white);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+
+.marker-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    transition: all var(--transition-fast);
+}
+
+.marker-dot.green {
+    background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+    box-shadow: 0 2px 4px rgba(74, 222, 128, 0.4);
+}
+
+.marker-dot.red {
+    background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+    box-shadow: 0 2px 4px rgba(248, 113, 113, 0.4);
+}
+
+.marker-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    background: linear-gradient(135deg, var(--color-accent) 0%, #4f46e5 100%);
+    color: white;
+    border-radius: 11px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-left: 4px;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+}
+
+.marker-apply-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: var(--color-success);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.marker-apply-btn:hover:not(:disabled) {
+    background: #16a34a;
+}
+
+.marker-apply-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.marker-clear-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    background: var(--color-gray-100);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--color-gray-500);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.marker-clear-btn:hover {
+    background: #fee2e2;
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+}
+
+/* マーカープレビューパネル - モダンスライドイン */
+.marker-preview-panel {
+    position: fixed;
+    top: 0;
+    right: -450px;
+    width: 420px;
+    height: 100vh;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(20px);
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: -8px 0 40px rgba(0, 0, 0, 0.12);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.marker-preview-panel.show {
+    right: 0;
+}
+
+.marker-preview-panel::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 420px;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0);
+    pointer-events: none;
+    transition: background 0.35s ease;
+    z-index: -1;
+}
+
+.marker-preview-panel.show::before {
+    background: rgba(0, 0, 0, 0.3);
+    pointer-events: auto;
+}
+
+.marker-preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    flex-shrink: 0;
+}
+
+.marker-preview-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--color-gray-800);
+}
+
+.marker-preview-title svg {
+    color: var(--color-accent);
+}
+
+.marker-preview-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-light) 100%);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 10px;
+}
+
+.marker-preview-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--color-gray-400);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.marker-preview-close:hover {
+    background: var(--color-gray-100);
+    color: var(--color-gray-600);
+    transform: rotate(90deg);
+}
+
+.marker-preview-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.marker-preview-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 12px 20px;
+    background: var(--color-gray-50);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+
+.marker-preview-tabs:empty {
+    display: none;
+}
+
+.marker-preview-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-gray-500);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.marker-preview-tab:hover {
+    background: rgba(99, 102, 241, 0.08);
+    color: var(--color-accent);
+}
+
+.marker-preview-tab.active {
+    background: white;
+    color: var(--color-accent);
+    border-color: rgba(99, 102, 241, 0.2);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1);
+}
+
+.marker-preview-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: var(--color-gray-200);
+    color: var(--color-gray-600);
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 9px;
+}
+
+.marker-preview-tab.active .marker-preview-tab-count {
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--color-accent);
+}
+
+.marker-preview-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    max-height: 100%;
+}
+
+.marker-preview-item {
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    flex-shrink: 0;
+}
+
+.marker-preview-item:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+.marker-preview-item-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 14px 14px;
+    border-top: 1px solid rgba(0, 0, 0, 0.04);
+    margin-top: 4px;
+}
+
+.marker-preview-single-apply {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-accent);
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.marker-preview-single-apply:hover {
+    background: var(--color-accent);
+    color: white;
+}
+
+.marker-preview-single-apply:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--color-gray-100);
+    color: var(--color-gray-400);
+}
+
+.marker-preview-item.green-item {
+    border-left: 3px solid #22c55e;
+}
+
+.marker-preview-item.red-item {
+    border-left: 3px solid #ef4444;
+}
+
+.marker-preview-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: linear-gradient(180deg, #fafbfc 0%, #f5f6f8 100%);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.marker-preview-type {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.marker-preview-type.green {
+    color: #16a34a;
+}
+
+.marker-preview-type.red {
+    color: #dc2626;
+}
+
+.marker-preview-type .marker-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.marker-preview-type .marker-dot.green {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+}
+
+.marker-preview-type .marker-dot.red {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
+.marker-preview-scenario {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--color-gray-400);
+    padding: 2px 8px;
+    background: var(--color-gray-100);
+    border-radius: 4px;
+}
+
+.marker-preview-delete {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--color-gray-300);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.marker-preview-delete:hover {
+    background: #fef2f2;
+    color: #ef4444;
+}
+
+.marker-preview-content {
+    padding: 14px;
+}
+
+.marker-preview-text {
+    padding: 10px 12px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f4 100%);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--color-gray-700);
+    margin-bottom: 10px;
+    word-break: break-word;
+}
+
+.marker-preview-text::before {
+    content: '"';
+    color: var(--color-gray-400);
+    font-size: 16px;
+    margin-right: 2px;
+}
+
+.marker-preview-text::after {
+    content: '"';
+    color: var(--color-gray-400);
+    font-size: 16px;
+    margin-left: 2px;
+}
+
+.marker-preview-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    resize: none;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.marker-preview-input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.marker-preview-input::placeholder {
+    color: var(--color-gray-400);
+}
+
+.marker-preview-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    color: var(--color-gray-400);
+    text-align: center;
+}
+
+.marker-preview-empty svg {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 16px;
+    opacity: 0.4;
+}
+
+.marker-preview-empty p {
+    font-size: 14px;
+    margin: 0 0 8px 0;
+}
+
+.marker-preview-empty span {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.marker-preview-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: linear-gradient(180deg, #fafbfc 0%, #f5f6f8 100%);
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    flex-shrink: 0;
+}
+
+.marker-preview-clear-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-gray-500);
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.marker-preview-clear-btn:hover {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #dc2626;
+}
+
+.marker-preview-apply-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-light) 100%);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.marker-preview-apply-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.marker-preview-apply-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.scenario-display {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--color-gray-400);
+}
+
+.empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.empty-state p {
+    font-size: 14px;
+}
+
+/* シナリオコンテンツ */
+.scenario-content {
+    background: var(--color-white);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    line-height: 1.8;
+    font-size: 15px;
+}
+
+/* シナリオカード */
+.scenario-card {
+    background: var(--color-white);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    margin-bottom: 16px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    transition: box-shadow var(--transition-fast);
+}
+
+.scenario-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.scenario-card:last-child {
+    margin-bottom: 0;
+}
+
+.scenario-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.scenario-card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-gray-700);
+}
+
+.copy-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-gray-600);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.copy-btn:hover {
+    background: var(--color-gray-50);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+
+.copy-btn.copied {
+    background: var(--color-success);
+    border-color: var(--color-success);
+    color: white;
+}
+
+.delete-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-gray-600);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    margin-left: 8px; /* copy-btnとの間隔 */
+}
+
+.delete-btn:hover {
+    background: #fee2e2;
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.copy-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.scenario-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* アクションボタン共通スタイル */
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-gray-600);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.action-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* 追加ボタン */
+.action-btn.add-btn:hover {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: #22c55e;
+    color: #16a34a;
+}
+
+/* 複製ボタン */
+.action-btn.duplicate-btn:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: #3b82f6;
+    color: #2563eb;
+}
+
+/* コピーボタン */
+.action-btn.copy-btn:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+
+.action-btn.copy-btn.copied {
+    background: var(--color-success);
+    border-color: var(--color-success);
+    color: white;
+}
+
+/* 削除ボタン */
+.action-btn.delete-btn:hover {
+    background: #fee2e2;
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.edit-scenario-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-gray-600);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.edit-scenario-btn:hover {
+    background: var(--color-gray-50);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+
+.edit-scenario-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.scenario-card-content {
+    padding: 20px 24px;
+    line-height: 1.9;
+    font-size: 15px;
+    color: var(--color-gray-800);
+}
+
+/* contenteditableシナリオ編集エリア */
+.scenario-editable {
+    outline: none;
+    cursor: text;
+    min-height: 100px;
+}
+
+.scenario-editable:focus {
+    background: rgba(99, 102, 241, 0.03);
+}
+
+/* マーカーハイライト - 蛍光ペン風 */
+.marker-highlight {
+    padding: 2px 4px;
+    margin: 0 1px;
+    border-radius: 3px;
+    cursor: default;
+    transition: all var(--transition-fast);
+}
+
+.marker-highlight.marker-green {
+    background-color: rgba(74, 222, 128, 0.45);
+    border-bottom: 3px solid rgba(34, 197, 94, 0.6);
+}
+
+.marker-highlight.marker-red {
+    background-color: rgba(248, 113, 113, 0.45);
+    border-bottom: 3px solid rgba(239, 68, 68, 0.6);
+}
+
+/* 編集モード */
+.scenario-card.editing .scenario-card-content {
+    padding: 20px 24px;
+}
+
+.scenario-edit-textarea {
+    width: 100%;
+    min-height: 100px;
+    height: auto;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    font-size: 15px;
+    line-height: 1.9;
+    font-family: inherit;
+    color: var(--color-gray-800);
+    resize: none;
+    outline: none;
+    background: transparent;
+    cursor: text;
+    overflow: hidden;
+}
+
+.scenario-edit-textarea:focus {
+    background: rgba(99, 102, 241, 0.03);
+    border-radius: var(--radius-sm);
+    padding: 8px;
+    margin: -8px;
+}
+
+.scenario-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.scenario-cancel-btn,
+.scenario-save-btn {
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.scenario-cancel-btn {
+    background: var(--color-gray-100);
+    border: 1px solid var(--color-gray-200);
+    color: var(--color-gray-600);
+}
+
+.scenario-cancel-btn:hover {
+    background: var(--color-gray-200);
+}
+
+.scenario-save-btn {
+    background: var(--color-accent);
+    border: 1px solid var(--color-accent);
+    color: white;
+}
+
+.scenario-save-btn:hover {
+    background: var(--color-accent-light);
+}
+
+/* トースト通知 */
+.toast-notification {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    padding: 12px 24px;
+    background: var(--color-gray-800);
+    color: white;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 9999;
+}
+
+.toast-notification.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* マーカースタイル */
+.marker-green {
+    background-color: rgba(34, 197, 94, 0.3);
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.marker-red {
+    background-color: rgba(239, 68, 68, 0.3);
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+/* ========================================
+   チャットパネル（右）
+   ======================================== */
+
+.chat-panel {
+    width: var(--chat-width);
+    display: flex;
+    flex-direction: column;
+    background: var(--color-white);
+    border-left: 1px solid var(--border-color);
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.chat-message {
+    display: flex;
+    gap: 12px;
+}
+
+.chat-message.user {
+    flex-direction: row-reverse;
+}
+
+.message-content {
+    max-width: 85%;
+    padding: 12px 16px;
+    border-radius: var(--radius-lg);
+    background: var(--color-gray-100);
+}
+
+.chat-message.user .message-content {
+    background: var(--color-accent);
+    color: white;
+}
+
+.chat-message.system .message-content {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #bae6fd;
+}
+
+.message-content p {
+    margin: 0;
+}
+
+.message-content .hint {
+    font-size: 12px;
+    color: var(--color-gray-500);
+    margin-top: 8px;
+}
+
+.chat-message.system .hint {
+    color: #0369a1;
+}
+
+/* チャット入力エリア */
+.chat-input-area {
+    padding: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.chat-image-previews {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.chat-image-previews:empty {
+    display: none;
+}
+
+.preview-item {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.preview-remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+/* 事前設定パネル */
+.preset-panel {
+    border-bottom: 1px solid var(--color-gray-100);
+    background: var(--color-gray-50);
+}
+
+.preset-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    cursor: pointer;
+}
+
+.preset-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-gray-600);
+}
+
+.preset-toggle {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--color-gray-500);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.preset-toggle:hover {
+    background: var(--color-gray-200);
+}
+
+.preset-toggle svg {
+    transition: transform var(--transition-fast);
+}
+
+.preset-panel.collapsed .preset-toggle svg {
+    transform: rotate(-90deg);
+}
+
+.preset-content {
+    padding: 0 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.preset-panel.collapsed .preset-content {
+    display: none;
+}
+
+.preset-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.preset-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-gray-500);
+}
+
+.preset-input {
+    padding: 8px 10px;
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    background: white;
+    transition: border-color var(--transition-fast);
+}
+
+.preset-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.preset-textarea {
+    padding: 8px 10px;
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    background: white;
+    resize: vertical;
+    min-height: 50px;
+    font-family: inherit;
+    transition: border-color var(--transition-fast);
+}
+
+.preset-textarea:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.attach-btn {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-gray-100);
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--color-gray-600);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.attach-btn:hover {
+    background: var(--color-gray-200);
+    color: var(--color-gray-800);
+}
+
+.attach-btn.has-images {
+    background: var(--color-accent);
+    color: white;
+}
+
+.chat-input {
+    flex: 1;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    padding: 10px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 22px;
+    resize: none;
+    outline: none;
+    transition: border-color var(--transition-fast);
+    font-size: 14px;
+    line-height: 1.5;
+    overflow-y: hidden;
+    background: var(--color-gray-50);
+}
+
+.chat-input:focus {
+    border-color: var(--color-accent);
+}
+
+.chat-send-btn {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-accent);
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.chat-send-btn:hover {
+    background: var(--color-accent-light);
+}
+
+.chat-send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.input-options {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.option-label {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    color: var(--color-gray-600);
+}
+
+.option-label select {
+    padding: 8px 12px;
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-sm);
+    background: white;
+    color: var(--color-gray-800);
+    font-size: 13px;
+    cursor: pointer;
+    min-width: 100px;
+}
+
+.option-label select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+/* ========================================
+   モーダル
+   ======================================== */
+
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal-content {
+    width: 90%;
+    max-width: 500px;
+    background: var(--color-white);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.modal-close {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 18px;
+    color: var(--color-gray-500);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.modal-close:hover {
+    background: var(--color-gray-100);
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-gray-700);
+    margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    outline: none;
+    transition: border-color var(--transition-fast);
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    border-color: var(--color-accent);
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 150px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.btn {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-secondary {
+    background: var(--color-gray-100);
+    color: var(--color-gray-700);
+}
+
+.btn-secondary:hover {
+    background: var(--color-gray-200);
+}
+
+.btn-primary {
+    background: var(--color-accent);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--color-accent-light);
+}
+
+/* ========================================
+   ユーティリティ
+   ======================================== */
+
+.thinking {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--color-gray-100);
+    border-radius: var(--radius-lg);
+    color: var(--color-gray-600);
+    font-size: 13px;
+}
+
+.thinking-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.thinking-dots {
+    display: flex;
+    gap: 4px;
+}
+
+.thinking-dots span {
+    width: 6px;
+    height: 6px;
+    background: var(--color-gray-400);
+    border-radius: 50%;
+    animation: bounce 1.4s ease-in-out infinite;
+}
+
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+.thinking-abort-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--color-gray-200);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--color-gray-600);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.thinking-abort-btn:hover {
+    background: var(--color-danger);
+    color: white;
+}
+
+@keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-6px); }
+}
+
+/* ========================================
+   マーカーツールバー
+   ======================================== */
+
+.marker-toolbar {
+    display: none;
+    position: fixed;
+    z-index: 1001;
+    background: var(--color-white);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    padding: 6px;
+    gap: 6px;
+}
+
+.marker-toolbar.show {
+    display: flex;
+}
+
+.marker-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--color-gray-50);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.marker-btn:hover {
+    border-color: var(--color-gray-300);
+}
+
+.marker-green-btn:hover {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: var(--color-success);
+}
+
+.marker-red-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--color-danger);
+}
+
+.marker-icon {
+    font-size: 14px;
+}
+
+.marker-label {
+    color: var(--color-gray-700);
+}
+
+/* モーダル拡張 */
+.modal-wide {
+    max-width: 600px;
+}
+
+.selected-text-preview {
+    padding: 12px;
+    background: var(--color-gray-50);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    line-height: 1.6;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.marker-type-info {
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    margin-top: 8px;
+}
+
+.marker-type-info.green {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #166534;
+}
+
+.marker-type-info.red {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #991b1b;
+}
+
+/* シナリオコンテンツ内のマーカー */
+.scenario-content .marker-green {
+    background-color: rgba(34, 197, 94, 0.3);
+    padding: 0 2px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+}
+
+.scenario-content .marker-green:hover {
+    background-color: rgba(34, 197, 94, 0.5);
+}
+
+.scenario-content .marker-red {
+    background-color: rgba(239, 68, 68, 0.3);
+    padding: 0 2px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+}
+
+.scenario-content .marker-red:hover {
+    background-color: rgba(239, 68, 68, 0.5);
+}
+
+/* ========================================
+   シナリオアイテムのアクションボタン
+   ======================================== */
+
+.scenario-item-actions {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.scenario-item:hover .scenario-item-actions {
+    opacity: 1;
+}
+
+.scenario-action-btn {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-gray-100);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    color: var(--color-gray-500);
+}
+
+.scenario-action-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.scenario-action-btn:hover {
+    background: var(--color-gray-200);
+}
+
+.scenario-action-btn.edit-btn:hover {
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--color-accent);
+}
+
+.scenario-action-btn.delete-btn {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.scenario-action-btn.delete-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #dc2626;
+}
+
+/* 削除モーダル */
+.modal-small {
+    max-width: 400px;
+}
+
+.btn-danger {
+    background: var(--color-danger);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+}
+
+.delete-warning {
+    color: var(--color-danger);
+    font-size: 12px;
+    margin-top: 8px;
+}
+
+/* ========================================
+   動画アップロード機能
+   ======================================== */
+
+.video-upload-group {
+    margin-top: 8px;
+}
+
+.video-upload-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--color-gray-50);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    width: fit-content;
+}
+
+.video-upload-header:hover {
+    background: var(--color-gray-100);
+    border-color: var(--color-gray-300);
+}
+
+.video-upload-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-gray-600);
+}
+
+.video-upload-arrow {
+    color: var(--color-gray-400);
+    transition: transform var(--transition-fast);
+}
+
+.video-upload-group.open .video-upload-arrow {
+    transform: rotate(180deg);
+}
+
+.video-upload-content {
+    margin-top: 8px;
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.video-upload-area {
+    border: 2px dashed var(--color-gray-300);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    transition: all var(--transition-fast);
+    cursor: pointer;
+}
+
+.video-upload-area:hover {
+    border-color: var(--color-accent);
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.upload-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-gray-500);
+}
+
+.upload-placeholder svg {
+    color: var(--color-gray-400);
+}
+
+.upload-placeholder span {
+    font-size: 13px;
+}
+
+.upload-hint {
+    font-size: 11px !important;
+    color: var(--color-gray-400) !important;
+}
+
+.upload-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--color-gray-200);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--color-accent), var(--color-accent-light));
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    animation: progressPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes progressPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.progress-text {
+    font-size: 13px;
+    color: var(--color-gray-600);
+}
+
+.upload-result {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-success);
+}
+
+.upload-result svg {
+    color: var(--color-success);
+}
+
+.upload-result span {
+    font-size: 13px;
+}
+
+.video-upload-area.error {
+    border-color: var(--color-danger);
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.video-upload-area.error .upload-result {
+    color: var(--color-danger);
+}
+
+.video-upload-area.error .upload-result svg {
+    color: var(--color-danger);
+}
