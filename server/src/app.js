@@ -29,20 +29,33 @@ app.use(cors());
 app.use(express.json({ limit: config.jsonLimit }));
 // app.use(requestLogger); // 必要に応じて有効化
 
-// 静的ファイル配信（必要なパスのみホワイトリスト）
+// アップロードディレクトリの事前作成
+const { ensureDir } = require('./repositories/file');
+(async () => {
+    await ensureDir(config.paths.uploads);
+})();
+
+// 静的ファイル配信（必要なパスのみ - server/以下は含めない）
 app.use('/tools', express.static(path.join(config.paths.root, 'tools')));
 app.use('/css', express.static(path.join(config.paths.root, 'css')));
 app.use('/js', express.static(path.join(config.paths.root, 'js')));
-app.use(express.static(config.paths.root, { 
-    index: 'index.html',
-    dotfiles: 'ignore'
-}));
+// ルートへのアクセスはindex.htmlのみ
+app.get('/', (req, res) => {
+    res.sendFile(path.join(config.paths.root, 'index.html'));
+});
 
-// APIルート登録
+// APIルート登録（重複なし）
 app.use('/api/chat', chatRoutes);
-app.use('/api', chatRoutes); // /api/health も含む
 app.use('/api/scenario', scenarioRoutes);
 app.use('/api/banner', bannerRoutes);
+
+// ヘルスチェック（/api直下に配置）
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'ok',
+        apis: getClientStatus()
+    });
+});
 
 // Mixboard ツールへのショートカット
 app.get('/mixboard', (req, res) => {

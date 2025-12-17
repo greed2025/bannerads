@@ -10,7 +10,7 @@ const fs = require('fs');
 const multer = require('multer');
 const { config } = require('../config');
 const { anthropic, openai, sendClaudeMessage, transcribeWithWhisper } = require('../services/llm');
-const { loadWritingStyle, loadSkills, sanitizeFilename, ensureDir, existsSync, readText, writeText, listFiles } = require('../repositories/file');
+const { loadWritingStyle, loadSkills, sanitizeFilename, ensureDir, existsSync, readText, writeText, listFiles, deleteFile } = require('../repositories/file');
 
 // 動画アップロード用の設定
 const upload = multer({
@@ -356,7 +356,7 @@ router.delete('/delete', async (req, res) => {
             return res.status(404).json({ error: 'ファイルが見つかりません' });
         }
         
-        fs.unlinkSync(filePath);
+        await deleteFile(filePath);
         
         res.json({ success: true, message: 'シナリオを削除しました' });
     } catch (error) {
@@ -391,7 +391,7 @@ router.put('/update', async (req, res) => {
         
         // 古いファイルを削除（名前が変わる場合）
         if (filename !== safeName && existsSync(oldFilePath)) {
-            fs.unlinkSync(oldFilePath);
+            await deleteFile(oldFilePath);
         }
         
         // 新しい内容で保存
@@ -522,8 +522,8 @@ router.post('/transcribe', upload.single('video'), async (req, res) => {
         }
         
         // クリーンアップ
-        if (existsSync(filePath)) fs.unlinkSync(filePath);
-        if (audioPath && existsSync(audioPath)) fs.unlinkSync(audioPath);
+        if (existsSync(filePath)) await deleteFile(filePath);
+        if (audioPath && existsSync(audioPath)) await deleteFile(audioPath);
         
         res.json({
             success: true,
@@ -535,11 +535,15 @@ router.post('/transcribe', upload.single('video'), async (req, res) => {
         console.error('Transcribe error:', error);
         
         // アップロードファイルがあれば削除
-        if (req.file && existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
-        }
-        if (audioPath && existsSync(audioPath)) {
-            fs.unlinkSync(audioPath);
+        try {
+            if (req.file && existsSync(req.file.path)) {
+                await deleteFile(req.file.path);
+            }
+            if (audioPath && existsSync(audioPath)) {
+                await deleteFile(audioPath);
+            }
+        } catch (cleanupError) {
+            console.error('Cleanup error:', cleanupError);
         }
         
         let errorMessage = error.message;

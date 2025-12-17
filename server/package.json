@@ -4,10 +4,10 @@
   "description": "バナー作成ツール用AIバックエンド",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "start:new": "node src/app.js",
-    "dev": "node --watch index.js",
-    "dev:new": "node --watch src/app.js"
+    "start": "node src/app.js",
+    "start:legacy": "node index.js",
+    "dev": "node --watch src/app.js",
+    "dev:legacy": "node --watch index.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

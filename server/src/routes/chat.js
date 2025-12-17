@@ -306,15 +306,4 @@ router.post('/', async (req, res) => {
     }
 });
 
-/**
- * GET /api/health
- * ヘルスチェック
- */
-router.get('/health', (req, res) => {
-    res.json({ 
-        status: 'ok',
-        apis: getClientStatus()
-    });
-});
-
 module.exports = router;

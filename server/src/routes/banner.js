@@ -9,7 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const { config } = require('../config');
 const { anthropic, sendClaudeMessage } = require('../services/llm');
-const { sanitizeFilename, ensureDir, existsSync, readJson, writeJson, listFiles } = require('../repositories/file');
+const { sanitizeFilename, ensureDir, existsSync, readJson, writeJson, listFiles, deleteFile } = require('../repositories/file');
 
 /**
  * GET /banner/list
@@ -181,7 +181,7 @@ router.delete('/delete', async (req, res) => {
             return res.status(404).json({ error: 'ファイルが見つかりません' });
         }
         
-        fs.unlinkSync(filePath);
+        await deleteFile(filePath);
         
         res.json({ success: true, message: 'バナーを削除しました' });
     } catch (error) {

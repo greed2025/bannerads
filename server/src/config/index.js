@@ -58,7 +58,7 @@ const config = {
     },
     
     // リクエスト制限
-    jsonLimit: '10mb',
+    jsonLimit: '50mb',
     uploadLimit: 100 * 1024 * 1024, // 100MB
 };
 
