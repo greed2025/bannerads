@@ -19,7 +19,7 @@ const bannerRoutes = require('./routes/banner');
 const { errorHandler, requestLogger } = require('./middleware/errorHandler');
 
 // サービスから状態取得（ログ出力のため）
-const { getClientStatus, generateTextWithGemini } = require('./services/llm');
+const { getClientStatus, generateTextWithGemini, generateImageWithGemini } = require('./services/llm');
 
 // Expressアプリ初期化
 const app = express();
@@ -60,6 +60,42 @@ app.get('/api/health', (req, res) => {
 // Mixboard ツールへのショートカット
 app.get('/mixboard', (req, res) => {
     res.sendFile(path.join(config.paths.root, 'tools/mixboard/mixboard.html'));
+});
+
+// Mixboard専用 画像生成API（直接Geminiで生成）
+app.post('/api/mixboard/generate', async (req, res) => {
+    try {
+        const clientStatus = getClientStatus();
+        if (!clientStatus.gemini) {
+            return res.status(400).json({ 
+                error: 'Gemini APIが初期化されていません',
+                message: 'GEMINI_API_KEYを.envに設定してください'
+            });
+        }
+        
+        const { prompt, images = [], count = 1 } = req.body;
+        
+        if (!prompt) {
+            return res.status(400).json({ error: 'promptが必要です' });
+        }
+        
+        console.log(`🎨 Mixboard生成リクエスト: "${prompt.substring(0, 50)}...", 参考画像: ${images.length}枚`);
+        
+        const generatedImages = await generateImageWithGemini(prompt, count, images);
+        
+        res.json({
+            success: true,
+            generatedImages: generatedImages,
+            message: `${generatedImages.length}枚の画像を生成しました`
+        });
+        
+    } catch (error) {
+        console.error('Mixboard Generate Error:', error);
+        res.status(500).json({
+            error: '画像生成エラー',
+            message: error.message
+        });
+    }
 });
 
 // Gemini APIテスト

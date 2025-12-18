@@ -6,8 +6,8 @@
 const path = require('path');
 const dotenv = require('dotenv');
 
-// 環境変数読み込み
-const envPath = path.resolve(__dirname, '../../.env');
+// 環境変数読み込み（プロジェクトルートの.envを読み込む）
+const envPath = path.resolve(__dirname, '../../../.env');
 const result = dotenv.config({ path: envPath });
 if (result.error) {
     console.warn('⚠️ .envファイルが見つかりません:', envPath);
@@ -48,13 +48,13 @@ const config = {
     
     // パス設定
     paths: {
-        root: path.resolve(__dirname, '../..'),
-        server: path.resolve(__dirname, '..'),
-        knowledge: path.resolve(__dirname, '../knowledge'),
-        skills: path.resolve(__dirname, '../skills'),
-        banners: path.resolve(__dirname, '../banners'),
-        scenarios: path.resolve(__dirname, '../scenarios'),
-        uploads: path.resolve(__dirname, '../uploads'),
+        root: path.resolve(__dirname, '../../..'), // プロジェクトルート（serverの親）
+        server: path.resolve(__dirname, '../..'),
+        knowledge: path.resolve(__dirname, '../../knowledge'),
+        skills: path.resolve(__dirname, '../../skills'),
+        banners: path.resolve(__dirname, '../../banners'),
+        scenarios: path.resolve(__dirname, '../../scenarios'),
+        uploads: path.resolve(__dirname, '../../uploads'),
     },
     
     // リクエスト制限

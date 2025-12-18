@@ -30,7 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const toolPaths = {
         banner: 'tools/banner/banner.html',
-        scenario: 'tools/scenario/scenario.html'
+        scenario: 'tools/scenario/scenario.html',
+        mixboard: 'tools/mixboard/mixboard.html'
     };
 
     navLinks.forEach(link => {
@@ -84,6 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (toolName === 'scenario') {
             storageKey = 'scenario_projects';
             listElement = document.getElementById('scenarioProjectList');
+        } else if (toolName === 'mixboard') {
+            storageKey = 'mixboard_projects';
+            listElement = document.getElementById('mixboardProjectList');
         } else {
             return;
         }
