@@ -13,6 +13,7 @@ const { config } = require('./config');
 // ルーターインポート
 const chatRoutes = require('./routes/chat');
 const scenarioRoutes = require('./routes/scenario');
+const lpRoutes = require('./routes/lp');
 
 // ミドルウェアインポート
 const { errorHandler, requestLogger } = require('./middleware/errorHandler');
@@ -43,9 +44,10 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(config.paths.root, 'index.html'));
 });
 
-// APIルート登録（重複なし）
+// APIルート登録
 app.use('/api/chat', chatRoutes);
 app.use('/api/scenario', scenarioRoutes);
+app.use('/api/lp', lpRoutes);
 
 // ヘルスチェック（/api直下に配置）
 app.get('/api/health', (req, res) => {
@@ -58,6 +60,11 @@ app.get('/api/health', (req, res) => {
 // Mixboard ツールへのショートカット
 app.get('/mixboard', (req, res) => {
     res.sendFile(path.join(config.paths.root, 'tools/mixboard/mixboard.html'));
+});
+
+// LP Builder ツールへのショートカット
+app.get('/lpbuilder', (req, res) => {
+    res.sendFile(path.join(config.paths.root, 'tools/lpbuilder/lpbuilder.html'));
 });
 
 const IMAGE_ASPECT_RATIOS = [

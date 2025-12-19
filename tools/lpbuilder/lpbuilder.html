@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LP Builder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+    <link rel="stylesheet" href="/tools/lpbuilder/lpbuilder.css">
+</head>
+<body>
+    <div class="lpbuilder-app">
+        <!-- ヘッダー -->
+        <header class="lpbuilder-header">
+            <div class="header-left">
+                <button class="back-btn js-back-btn" title="戻る">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5"/>
+                        <polyline points="12 19 5 12 12 5"/>
+                    </svg>
+                </button>
+                <input type="text" class="project-name-input js-project-name" value="新規LP">
+            </div>
+            <div class="header-center">
+                <div class="viewport-controls">
+                    <button class="viewport-btn active js-viewport-btn" data-viewport="desktop" title="デスクトップ">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                            <line x1="8" y1="21" x2="16" y2="21"/>
+                            <line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                    </button>
+                    <button class="viewport-btn js-viewport-btn" data-viewport="tablet" title="タブレット">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="4" y="2" width="16" height="20" rx="2" ry="2"/>
+                            <line x1="12" y1="18" x2="12.01" y2="18"/>
+                        </svg>
+                    </button>
+                    <button class="viewport-btn js-viewport-btn" data-viewport="mobile" title="スマートフォン">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                            <line x1="12" y1="18" x2="12.01" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-secondary js-export-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    ZIP出力
+                </button>
+                <button class="btn btn-primary js-save-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                    </svg>
+                    保存
+                </button>
+            </div>
+        </header>
+
+        <!-- メインコンテンツ -->
+        <div class="lpbuilder-main">
+            <!-- 中央: プレビュー・エディタエリア -->
+            <div class="center-area">
+                <!-- タブヘッダー -->
+                <div class="tab-header">
+                    <div class="tab-list">
+                        <button class="tab-btn active js-tab-btn" data-tab="preview">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            プレビュー
+                        </button>
+                        <button class="tab-btn js-tab-btn" data-tab="html">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="16 18 22 12 16 6"/>
+                                <polyline points="8 6 2 12 8 18"/>
+                            </svg>
+                            HTML
+                        </button>
+                        <button class="tab-btn js-tab-btn" data-tab="css">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                <path d="M22 6l-10 7L2 6"/>
+                            </svg>
+                            CSS
+                        </button>
+                        <button class="tab-btn js-tab-btn" data-tab="js">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                            </svg>
+                            JS
+                        </button>
+                    </div>
+                    <div class="tab-actions">
+                        <button class="action-btn js-refresh-btn" title="プレビュー更新">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"/>
+                                <polyline points="1 20 1 14 7 14"/>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                            </svg>
+                        </button>
+                        <button class="action-btn js-fullscreen-btn" title="フルスクリーン">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="15 3 21 3 21 9"/>
+                                <polyline points="9 21 3 21 3 15"/>
+                                <line x1="21" y1="3" x2="14" y2="10"/>
+                                <line x1="3" y1="21" x2="10" y2="14"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- タブコンテンツ -->
+                <div class="tab-content">
+                    <!-- プレビュータブ -->
+                    <div class="tab-panel active" data-panel="preview">
+                        <div class="preview-wrapper">
+                            <div class="preview-frame js-preview-frame" data-viewport="desktop">
+                                <iframe class="preview-iframe js-preview-iframe" sandbox="allow-scripts allow-same-origin"></iframe>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- HTMLタブ -->
+                    <div class="tab-panel" data-panel="html">
+                        <div class="editor-wrapper">
+                            <textarea class="editor-textarea js-editor-html"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- CSSタブ -->
+                    <div class="tab-panel" data-panel="css">
+                        <div class="editor-wrapper">
+                            <textarea class="editor-textarea js-editor-css"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- JSタブ -->
+                    <div class="tab-panel" data-panel="js">
+                        <div class="editor-wrapper">
+                            <textarea class="editor-textarea js-editor-js"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI修正指示パネル -->
+                <div class="ai-instruction-panel">
+                    <div class="instruction-input-wrapper">
+                        <button class="apply-code-btn js-apply-code-btn" title="コードをAIに送信">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="16 18 22 12 16 6"/>
+                                <polyline points="8 6 2 12 8 18"/>
+                            </svg>
+                        </button>
+                        <input type="text" class="instruction-input js-instruction-input" placeholder="修正指示を入力（例：ヘッダーの色を青に変更）">
+                        <button class="send-instruction-btn js-send-instruction-btn" title="AIに修正指示を送信">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 16 16 12 12 8"/>
+                                <line x1="8" y1="12" x2="16" y2="12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右パネル: AIチャット -->
+            <aside class="right-panel js-right-panel">
+                <button class="panel-toggle-btn right js-right-panel-toggle" title="パネル開閉">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                </button>
+                <div class="panel-content">
+                    <div class="panel-header">
+                        <h2>AIアシスタント</h2>
+                        <button class="clear-chat-btn js-clear-chat" title="チャット履歴をクリア">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="chat-messages js-chat-messages">
+                        <div class="chat-message assistant">
+                            <div class="message-avatar">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/>
+                                    <path d="M12 16v-4"/>
+                                    <path d="M12 8h.01"/>
+                                </svg>
+                            </div>
+                            <div class="message-content">
+                                <p>こんにちは！LP作成をサポートします。どんなLPを作りたいですか？</p>
+                                <ul>
+                                    <li>業種（例：美容、飲食、不動産）</li>
+                                    <li>目的（例：資料請求、予約獲得）</li>
+                                    <li>ターゲット（例：20代女性）</li>
+                                </ul>
+                                <p>を教えていただけると、最適なLPを提案できます。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input-area">
+                        <textarea class="chat-input js-chat-input" placeholder="メッセージを入力..." rows="1"></textarea>
+                        <button class="chat-send-btn js-chat-send">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"/>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- プロジェクト選択モーダル -->
+    <div class="modal-overlay js-project-modal" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>プロジェクト選択</h3>
+                <button class="modal-close-btn js-modal-close">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="new-project-section">
+                    <button class="new-project-btn js-new-project">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        新規LPを作成
+                    </button>
+                </div>
+                <div class="project-list js-project-list">
+                    <!-- プロジェクト一覧が動的に追加される -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- トースト通知 -->
+    <div class="toast-container js-toast-container"></div>
+
+    <!-- 外部ライブラリ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="/tools/lpbuilder/lpbuilder.js"></script>
+</body>
+</html>
