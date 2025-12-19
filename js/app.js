@@ -30,7 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const toolPaths = {
         scenario: 'tools/scenario/scenario.html',
-        mixboard: 'tools/mixboard/mixboard.html'
+        mixboard: 'tools/mixboard/mixboard.html',
+        lpbuilder: 'tools/lpbuilder/lpbuilder.html'
     };
 
     navLinks.forEach(link => {
