@@ -231,8 +231,20 @@ function initEditors() {
     }
 }
 
+// 前回の値を保持（変更検知用）
+const previousValues = { html: '', css: '', js: '' };
+
 function handleEditorChange(type) {
-    // アンドゥ履歴に追加（デバウンス）
+    // 現在の値取得
+    const currentValue = state.editors[type]?.getValue() || '';
+    
+    // 値が実際に変わった場合のみ履歴に追加
+    if (previousValues[type] && previousValues[type] !== currentValue) {
+        pushToUndoHistory(type, previousValues[type]);
+    }
+    previousValues[type] = currentValue;
+    
+    // 自動保存（デバウンス）
     if (state.saveTimeout) {
         clearTimeout(state.saveTimeout);
     }
@@ -318,6 +330,11 @@ function initEventListeners() {
             e.preventDefault();
             sendModifyInstruction();
         }
+    });
+    
+    // コードをAIに送信ボタン
+    document.querySelector('.js-apply-code-btn')?.addEventListener('click', () => {
+        sendCurrentCodeToAI();
     });
     
     // ZIP出力
@@ -724,6 +741,11 @@ async function openProject(id) {
         if (state.editors.css) state.editors.css.setValue(project.files.css || '');
         if (state.editors.js) state.editors.js.setValue(project.files.js || '');
         
+        // 変更検知用の前回値を初期化
+        previousValues.html = project.files.html || '';
+        previousValues.css = project.files.css || '';
+        previousValues.js = project.files.js || '';
+        
         // チャット履歴を反映
         renderChatHistory();
         
@@ -925,6 +947,69 @@ async function sendModifyInstruction() {
     }
 }
 
+async function sendCurrentCodeToAI() {
+    if (!state.currentProject) {
+        showToast('プロジェクトを開いてください', 'warning');
+        return;
+    }
+    
+    const html = state.editors.html?.getValue() || '';
+    const css = state.editors.css?.getValue() || '';
+    const js = state.editors.js?.getValue() || '';
+    
+    // チャットにメッセージを追加
+    addChatMessage('user', '現在のコードを確認してください');
+    state.chatHistory.push({ 
+        role: 'user', 
+        content: '現在のコードを確認してください' 
+    });
+    
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/lp/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: `現在のコードを確認して、改善点があれば教えてください。
+
+HTML:
+\`\`\`html
+${html.substring(0, 2000)}
+\`\`\`
+
+CSS:
+\`\`\`css
+${css.substring(0, 1000)}
+\`\`\`
+
+JS:
+\`\`\`javascript
+${js.substring(0, 500)}
+\`\`\``,
+                chatHistory: state.chatHistory.slice(-5)
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            addChatMessage('assistant', data.message);
+            state.chatHistory.push({ role: 'assistant', content: data.message });
+            trimChatHistory();
+        } else {
+            addChatMessage('assistant', `エラー: ${data.error || '応答の取得に失敗しました'}`);
+        }
+    } catch (error) {
+        console.error('Send code error:', error);
+        addChatMessage('assistant', 'コード送信に失敗しました。再度お試しください。');
+    } finally {
+        hideLoading();
+    }
+    
+    saveCurrentState();
+}
+
 function addChatMessage(role, content) {
     const container = document.querySelector('.js-chat-messages');
     if (!container) return;
@@ -994,44 +1079,7 @@ function trimChatHistory() {
     }
 }
 
-// ========================================
-// 差分モーダル（簡易実装）
-// ========================================
-
-function showDiffModal(newCode, diff) {
-    // TODO: 差分表示モーダルの実装
-    // 現時点では確認ダイアログで代替
-    
-    const message = '新しいコードが生成されました。適用しますか？\n\n' +
-        '【適用】: 現在のコードを新しいコードに置き換えます\n' +
-        '【キャンセル】: 変更を破棄します';
-    
-    if (confirm(message)) {
-        applyNewCode(newCode);
-    }
-}
-
-function applyNewCode(newCode) {
-    if (!newCode) return;
-    
-    // アンドゥ履歴に現在の状態を保存
-    if (newCode.html && state.editors.html) {
-        pushToUndoHistory('html', state.editors.html.getValue());
-        state.editors.html.setValue(newCode.html);
-    }
-    if (newCode.css && state.editors.css) {
-        pushToUndoHistory('css', state.editors.css.getValue());
-        state.editors.css.setValue(newCode.css);
-    }
-    if (newCode.js && state.editors.js) {
-        pushToUndoHistory('js', state.editors.js.getValue());
-        state.editors.js.setValue(newCode.js);
-    }
-    
-    updatePreview();
-    saveCurrentState();
-    showToast('コードを適用しました', 'success');
-}
+// 古い差分モーダル関数は下部で再定義されているため削除済み
 
 // ========================================
 // ZIP出力
@@ -1080,12 +1128,18 @@ async function exportToZip() {
         const jsFolder = folder.folder('js');
         jsFolder.file('script.js', state.currentProject.files.js || getDefaultJs());
         
-        // img
+        // img（dataUrlからBlobに変換して出力）
         const imgFolder = folder.folder('img');
         if (state.currentProject.images) {
             for (const img of state.currentProject.images) {
                 if (img.blob) {
                     imgFolder.file(img.name, img.blob);
+                } else if (img.dataUrl) {
+                    // dataUrlをBlobに変換
+                    const blob = dataUrlToBlob(img.dataUrl);
+                    if (blob) {
+                        imgFolder.file(img.name, blob);
+                    }
                 }
             }
         }
@@ -1169,6 +1223,23 @@ function formatDate(isoString) {
         hour: '2-digit',
         minute: '2-digit'
     });
+}
+
+function dataUrlToBlob(dataUrl) {
+    try {
+        const arr = dataUrl.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new Blob([u8arr], { type: mime });
+    } catch (error) {
+        console.error('dataUrlToBlob error:', error);
+        return null;
+    }
 }
 
 function showToast(message, type = 'info') {
