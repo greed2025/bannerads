@@ -21,13 +21,13 @@ const JQUERY_BUNDLE = 'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery
 const state = {
     db: null,
     currentProject: null,
+    tabManager: new TabManager(),
     editors: {
         html: null,
         css: null,
         js: null
     },
     activeTab: 'preview',
-    viewport: 'desktop',
     chatHistory: [],
     undoHistory: { html: [], css: [], js: [] },
     redoHistory: { html: [], css: [], js: [] },
@@ -51,8 +51,8 @@ async function initializeApp() {
         // イベントリスナー設定
         initEventListeners();
         
-        // プロジェクトモーダル表示
-        showProjectModal();
+        // タブ状態復元または新規タブ作成
+        await restoreTabsOrCreateNew();
         
         console.log('LP Builder initialized');
     } catch (error) {
@@ -184,6 +184,392 @@ function calculateProjectSize(project) {
 }
 
 // ========================================
+// タブ管理
+// ========================================
+
+const TABS_STORAGE_KEY = 'lpbuilder_tabs';
+
+/**
+ * タブ状態を復元または新規タブ作成
+ */
+async function restoreTabsOrCreateNew() {
+    try {
+        // LocalStorageからタブ状態を読み込み
+        const savedTabs = localStorage.getItem(TABS_STORAGE_KEY);
+        
+        if (savedTabs) {
+            const tabData = JSON.parse(savedTabs);
+            state.tabManager.deserialize(tabData);
+            
+            // 各タブのプロジェクトをIndexedDBから取得し、有効なものだけ保持
+            const validTabs = [];
+            for (const tab of state.tabManager.getTabs()) {
+                if (tab.projectId) {
+                    const project = await getProject(tab.projectId);
+                    if (project) {
+                        validTabs.push(tab);
+                    }
+                }
+            }
+            
+            // 有効なタブがなければ新規作成
+            if (validTabs.length === 0) {
+                state.tabManager.tabs = [];
+                await createNewProjectTab();
+            } else {
+                // 無効なタブを削除
+                state.tabManager.tabs = validTabs;
+                
+                // アクティブタブが無効なら最初のタブをアクティブに
+                const activeTab = state.tabManager.getTabs().find(t => t.id === state.tabManager.activeTabId);
+                if (!activeTab && state.tabManager.getTabs().length > 0) {
+                    state.tabManager.activeTabId = state.tabManager.getTabs()[0].id;
+                }
+                
+                // アクティブタブのプロジェクトを読み込み
+                await loadActiveTabProject();
+            }
+        } else {
+            // 初回起動: 新規タブ作成
+            await createNewProjectTab();
+        }
+        
+        // タブUI更新
+        renderProjectTabs();
+        saveTabState();
+        
+    } catch (error) {
+        console.error('タブ復元エラー:', error);
+        // エラー時も新規タブ作成
+        await createNewProjectTab();
+        renderProjectTabs();
+    }
+}
+
+/**
+ * 新規プロジェクトタブを作成
+ */
+async function createNewProjectTab() {
+    // 新規プロジェクト作成
+    const project = createDefaultProject();
+    await saveProject(project);
+    
+    // タブ作成
+    const tab = state.tabManager.createTab(project.name, project.id);
+    if (!tab) {
+        showToast('タブは最大5つまでです', 'warning');
+        return null;
+    }
+    
+    // プロジェクトを読み込み
+    state.currentProject = project;
+    loadProjectToEditors(project);
+    
+    renderProjectTabs();
+    saveTabState();
+    
+    return tab;
+}
+
+/**
+ * アクティブタブのプロジェクトを読み込み
+ */
+async function loadActiveTabProject() {
+    const activeTab = state.tabManager.getTabs().find(t => t.id === state.tabManager.activeTabId);
+    if (!activeTab || !activeTab.projectId) return;
+    
+    const project = await getProject(activeTab.projectId);
+    if (project) {
+        state.currentProject = project;
+        loadProjectToEditors(project);
+    }
+}
+
+/**
+ * プロジェクトをエディタに読み込み
+ */
+function loadProjectToEditors(project) {
+    if (state.editors.html) {
+        state.editors.html.setValue(project.files?.html || '');
+    }
+    if (state.editors.css) {
+        state.editors.css.setValue(project.files?.css || '');
+    }
+    if (state.editors.js) {
+        state.editors.js.setValue(project.files?.js || '');
+    }
+    
+    // チャット履歴復元
+    state.chatHistory = project.chatHistory || [];
+    renderChatHistory();
+    
+    // プレビュー更新
+    updatePreview();
+}
+
+/**
+ * タブUIをレンダリング
+ */
+function renderProjectTabs() {
+    const tabList = document.querySelector('.js-project-tab-list');
+    const addBtn = document.querySelector('.js-add-tab');
+    if (!tabList) return;
+    
+    const tabs = state.tabManager.getTabs();
+    const activeTabId = state.tabManager.getActiveTabId();
+    
+    tabList.innerHTML = tabs.map(tab => `
+        <div class="project-tab ${tab.id === activeTabId ? 'active' : ''}" data-tab-id="${tab.id}">
+            <span class="project-tab-name">${escapeHtml(tab.name)}</span>
+            ${tab.isDirty ? '<span class="project-tab-dirty"></span>' : ''}
+            <button class="project-tab-close" data-tab-id="${tab.id}">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+    `).join('');
+    
+    // [+]ボタンの状態
+    if (addBtn) {
+        addBtn.disabled = tabs.length >= 5;
+    }
+    
+    // タブクリックイベント
+    tabList.querySelectorAll('.project-tab').forEach(tabEl => {
+        tabEl.addEventListener('click', async (e) => {
+            if (e.target.closest('.project-tab-close')) return;
+            
+            const tabId = tabEl.dataset.tabId;
+            await switchToTab(tabId);
+        });
+    });
+    
+    // 閉じるボタンイベント
+    tabList.querySelectorAll('.project-tab-close').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const tabId = btn.dataset.tabId;
+            await closeProjectTab(tabId);
+        });
+    });
+}
+
+/**
+ * タブ切り替え
+ */
+async function switchToTab(tabId) {
+    // 現在のプロジェクトを保存
+    await saveCurrentState();
+    
+    // タブ切り替え
+    state.tabManager.switchTab(tabId);
+    
+    // プロジェクト読み込み
+    await loadActiveTabProject();
+    
+    renderProjectTabs();
+    saveTabState();
+}
+
+/**
+ * タブを閉じる
+ */
+async function closeProjectTab(tabId) {
+    const tab = state.tabManager.getTabs().find(t => t.id === tabId);
+    if (!tab) return;
+    
+    // 未保存確認
+    if (tab.isDirty) {
+        if (!confirm('未保存の変更があります。閉じますか？')) {
+            return;
+        }
+    }
+    
+    // 現在のプロジェクトを保存
+    if (state.tabManager.getActiveTabId() === tabId) {
+        await saveCurrentState();
+    }
+    
+    // タブを閉じる
+    state.tabManager.closeTab(tabId);
+    
+    // アクティブタブのプロジェクトを読み込み
+    await loadActiveTabProject();
+    
+    renderProjectTabs();
+    saveTabState();
+}
+
+/**
+ * タブ状態をLocalStorageに保存
+ */
+function saveTabState() {
+    const data = state.tabManager.serialize();
+    localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(data));
+}
+
+/**
+ * デフォルトプロジェクトを作成
+ */
+function createDefaultProject() {
+    return {
+        id: generateId(),
+        name: '新規LP',
+        files: {
+            html: `<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ランディングページ</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header__container">
+            <h1 class="header__title">見出しテキスト</h1>
+            <p class="header__subtitle">サブタイトルテキスト</p>
+        </div>
+    </header>
+    
+    <main class="main">
+        <section class="hero">
+            <div class="hero__container">
+                <h2 class="hero__heading">メインキャッチコピー</h2>
+                <p class="hero__text">説明テキストがここに入ります。</p>
+                <a href="<?= $url ?>" class="hero__cta js-cta-btn">今すぐ申し込む</a>
+            </div>
+        </section>
+    </main>
+    
+    <footer class="footer">
+        <div class="footer__container">
+            <nav class="footer__nav">
+                <a href="../../company.html">運営者情報</a>
+                <a href="../../privacy_policy.html">プライバシーポリシー</a>
+            </nav>
+        </div>
+    </footer>
+    
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>`,
+            css: `/* ========================================
+   LP スタイル
+   ======================================== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    line-height: 1.6;
+    color: #333;
+}
+
+.header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 60px 20px;
+    text-align: center;
+}
+
+.header__title {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.header__subtitle {
+    font-size: 1rem;
+    opacity: 0.9;
+}
+
+.hero {
+    padding: 80px 20px;
+    text-align: center;
+    background: #f8f9fa;
+}
+
+.hero__heading {
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.hero__text {
+    font-size: 1rem;
+    color: #666;
+    margin-bottom: 30px;
+}
+
+.hero__cta {
+    display: inline-block;
+    padding: 15px 40px;
+    background: #667eea;
+    color: white;
+    text-decoration: none;
+    border-radius: 30px;
+    font-weight: bold;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.hero__cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+.footer {
+    background: #333;
+    color: white;
+    padding: 30px 20px;
+    text-align: center;
+}
+
+.footer__nav a {
+    color: white;
+    text-decoration: none;
+    margin: 0 15px;
+    opacity: 0.8;
+}
+
+.footer__nav a:hover {
+    opacity: 1;
+}`,
+            js: `$(function() {
+    initializePage();
+    
+    function initializePage() {
+        // CTAボタンのクリックイベント
+        $('.js-cta-btn').on('click', function(e) {
+            // 必要に応じてトラッキング等を追加
+        });
+    }
+});`
+        },
+        images: [],
+        chatHistory: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    };
+}
+
+function generateId() {
+    return 'p-' + Date.now() + '-' + Math.random().toString(36).substring(2, 11);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ========================================
 // CodeMirrorエディタ
 // ========================================
 
@@ -241,6 +627,14 @@ function handleEditorChange(type) {
     // 値が実際に変わった場合のみ履歴に追加
     if (previousValues[type] && previousValues[type] !== currentValue) {
         pushToUndoHistory(type, previousValues[type]);
+        
+        // タブをダーティ状態に
+        const activeTabId = state.tabManager.getActiveTabId();
+        const activeTab = state.tabManager.getTabs().find(t => t.id === activeTabId);
+        if (activeTab && !activeTab.isDirty) {
+            activeTab.isDirty = true;
+            renderProjectTabs();
+        }
     }
     previousValues[type] = currentValue;
     
@@ -261,23 +655,15 @@ function handleEditorChange(type) {
 function initEventListeners() {
     // 戻るボタン
     document.querySelector('.js-back-btn')?.addEventListener('click', () => {
-        showProjectModal();
-    });
-    
-    // プロジェクト名変更
-    document.querySelector('.js-project-name')?.addEventListener('change', (e) => {
-        if (state.currentProject) {
-            state.currentProject.name = e.target.value;
-            saveCurrentState();
+        // サイドバーへのナビゲーション（親ウィンドウに通知）
+        if (window.parent !== window) {
+            window.parent.postMessage({ type: 'navigateBack' }, '*');
         }
     });
     
-    // ビューポート切替
-    document.querySelectorAll('.js-viewport-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const viewport = btn.dataset.viewport;
-            setViewport(viewport);
-        });
+    // 新規タブ追加ボタン
+    document.querySelector('.js-add-tab')?.addEventListener('click', async () => {
+        await createNewProjectTab();
     });
     
     // タブ切替
@@ -782,6 +1168,14 @@ async function saveCurrentState() {
         state.currentProject.history = state.undoHistory;
         
         await saveProject(state.currentProject);
+        
+        // タブのダーティ状態をクリア
+        const activeTabId = state.tabManager.getActiveTabId();
+        const activeTab = state.tabManager.getTabs().find(t => t.id === activeTabId);
+        if (activeTab && activeTab.isDirty) {
+            activeTab.isDirty = false;
+            renderProjectTabs();
+        }
     } catch (error) {
         console.error('Failed to save:', error);
         showToast('保存に失敗しました', 'error');

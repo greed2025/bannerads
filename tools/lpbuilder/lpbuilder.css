@@ -119,60 +119,134 @@ button {
     color: var(--color-gray-800);
 }
 
-.project-name-input {
-    padding: 6px 10px;
+.header-title {
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--color-gray-800);
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    outline: none;
-    transition: all var(--transition-fast);
-    min-width: 150px;
 }
 
-.project-name-input:hover {
-    background: var(--color-gray-50);
-}
+/* ========================================
+   プロジェクトタブバー
+   ======================================== */
 
-.project-name-input:focus {
-    background: var(--color-white);
-    border-color: var(--color-primary);
-}
-
-.header-center {
+.project-tabs {
     display: flex;
     align-items: center;
-}
-
-.viewport-controls {
-    display: flex;
+    padding: 0 16px;
+    height: 40px;
     background: var(--color-gray-100);
-    border-radius: var(--radius-md);
-    padding: 4px;
-    gap: 2px;
+    border-bottom: 1px solid var(--border-color);
+    gap: 4px;
+    flex-shrink: 0;
 }
 
-.viewport-btn {
-    width: 36px;
-    height: 32px;
+.project-tab-list {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+    overflow-x: auto;
+}
+
+.project-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--color-white);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-gray-600);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    max-width: 160px;
+}
+
+.project-tab:hover {
+    border-color: var(--color-gray-300);
+    color: var(--color-gray-800);
+}
+
+.project-tab.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-white);
+}
+
+.project-tab-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.project-tab-dirty {
+    width: 6px;
+    height: 6px;
+    background: var(--color-warning);
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.project-tab.active .project-tab-dirty {
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.project-tab-close {
+    width: 16px;
+    height: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-gray-500);
-    border-radius: var(--radius-sm);
+    border-radius: 50%;
+    color: var(--color-gray-400);
+    flex-shrink: 0;
     transition: all var(--transition-fast);
 }
 
-.viewport-btn:hover {
-    color: var(--color-gray-700);
+.project-tab-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: var(--color-gray-600);
 }
 
-.viewport-btn.active {
-    background: var(--color-white);
+.project-tab.active .project-tab-close {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.project-tab.active .project-tab-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--color-white);
+}
+
+.project-tab-add {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px dashed var(--color-gray-300);
+    border-radius: var(--radius-sm);
+    color: var(--color-gray-400);
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.project-tab-add:hover {
+    border-color: var(--color-primary);
     color: var(--color-primary);
-    box-shadow: var(--shadow-sm);
+    background: var(--color-primary-light);
+}
+
+.project-tab-add:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.project-tab-add:disabled:hover {
+    border-color: var(--color-gray-300);
+    color: var(--color-gray-400);
+    background: transparent;
 }
 
 .header-right {
@@ -323,28 +397,60 @@ button {
     overflow: auto;
 }
 
-.preview-frame {
-    background: var(--color-white);
-    box-shadow: var(--shadow-xl);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    transition: all var(--transition-normal);
+/* スマホフレーム */
+.smartphone-frame {
+    width: 395px;
+    height: 815px;
+    background: #1a1a1a;
+    border-radius: 45px;
+    padding: 12px;
+    box-shadow: 
+        0 0 0 3px #333,
+        0 25px 60px rgba(0, 0, 0, 0.3);
+    position: relative;
 }
 
-.preview-frame[data-viewport="desktop"] {
+.smartphone-notch {
+    width: 120px;
+    height: 28px;
+    background: #1a1a1a;
+    border-radius: 0 0 16px 16px;
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+}
+
+.smartphone-notch::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: #333;
+    border-radius: 50%;
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.smartphone-screen {
     width: 100%;
-    max-width: 1200px;
-    height: 100%;
+    height: calc(100% - 20px);
+    background: var(--color-white);
+    border-radius: 35px;
+    overflow: hidden;
 }
 
-.preview-frame[data-viewport="tablet"] {
-    width: 768px;
-    height: 100%;
-}
-
-.preview-frame[data-viewport="mobile"] {
-    width: 375px;
-    height: 100%;
+.smartphone-home-indicator {
+    width: 130px;
+    height: 5px;
+    background: #333;
+    border-radius: 3px;
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
 }
 
 .preview-iframe {

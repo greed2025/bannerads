@@ -147,6 +147,37 @@ describe('TabManager', () => {
         assert(newManager.getTabs()[0].name === 'LP1', '1番目のタブ名はLP1');
         assert(newManager.getTabs()[1].projectId === 'project-2', '2番目のprojectIdはproject-2');
     });
+    
+    it('projectIdでタブを検索できる', () => {
+        // Arrange
+        const { TabManager } = require('../tabManager.js');
+        const manager = new TabManager();
+        manager.createTab('LP1', 'project-1');
+        const tab2 = manager.createTab('LP2', 'project-2');
+        
+        // Act
+        const found = manager.findTabByProjectId('project-2');
+        const notFound = manager.findTabByProjectId('project-999');
+        
+        // Assert
+        assert(found !== null, 'project-2のタブが見つかるべき');
+        assert(found.id === tab2.id, '見つかったタブはtab2であるべき');
+        assert(notFound === null, '存在しないprojectIdはnullを返すべき');
+    });
+    
+    it('タブ名を変更できる', () => {
+        // Arrange
+        const { TabManager } = require('../tabManager.js');
+        const manager = new TabManager();
+        const tab = manager.createTab('古い名前');
+        
+        // Act
+        const result = manager.renameTab(tab.id, '新しい名前');
+        
+        // Assert
+        assert(result === true, 'renameTabはtrueを返すべき');
+        assert(manager.getTabs()[0].name === '新しい名前', 'タブ名が変更されているべき');
+    });
 
 });
 

@@ -126,6 +126,28 @@ class TabManager {
     }
     
     /**
+     * projectIdでタブを検索
+     * @param {string} projectId - 検索するプロジェクトID
+     * @returns {Object|null} 見つかったタブ、またはnull
+     */
+    findTabByProjectId(projectId) {
+        return this.tabs.find(t => t.projectId === projectId) || null;
+    }
+    
+    /**
+     * タブ名を変更
+     * @param {string} tabId - タブID
+     * @param {string} newName - 新しい名前
+     * @returns {boolean} 成功時true
+     */
+    renameTab(tabId, newName) {
+        const tab = this.tabs.find(t => t.id === tabId);
+        if (!tab) return false;
+        tab.name = newName;
+        return true;
+    }
+    
+    /**
      * UUID生成
      * @private
      */
