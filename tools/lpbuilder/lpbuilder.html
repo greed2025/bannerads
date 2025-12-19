@@ -48,6 +48,23 @@
                 </div>
             </div>
             <div class="header-right">
+                <button class="btn btn-secondary js-image-btn" title="画像生成">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    画像生成
+                </button>
+                <button class="btn btn-secondary js-template-btn" title="テンプレート">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"/>
+                        <rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                    テンプレ
+                </button>
                 <button class="btn btn-secondary js-export-btn">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -247,9 +264,117 @@
                         </svg>
                         新規LPを作成
                     </button>
+                    <button class="new-project-btn js-template-select" style="margin-top: 8px; border-color: var(--color-primary); color: var(--color-primary);">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"/>
+                            <rect x="14" y="3" width="7" height="7"/>
+                            <rect x="14" y="14" width="7" height="7"/>
+                            <rect x="3" y="14" width="7" height="7"/>
+                        </svg>
+                        テンプレートから作成
+                    </button>
                 </div>
                 <div class="project-list js-project-list">
                     <!-- プロジェクト一覧が動的に追加される -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 差分表示モーダル -->
+    <div class="modal-overlay js-diff-modal" style="display: none;">
+        <div class="modal" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3>コード変更の確認</h3>
+                <button class="modal-close-btn js-diff-modal-close">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="diff-tabs">
+                    <button class="diff-tab-btn active" data-diff-tab="html">HTML</button>
+                    <button class="diff-tab-btn" data-diff-tab="css">CSS</button>
+                    <button class="diff-tab-btn" data-diff-tab="js">JS</button>
+                </div>
+                <div class="diff-content js-diff-content" style="max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px; background: #282a36; padding: 16px; border-radius: 8px;">
+                    <!-- 差分が動的に表示される -->
+                </div>
+                <p class="diff-message js-diff-message" style="margin-top: 16px; color: var(--color-gray-600);"></p>
+            </div>
+            <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; padding: 16px 24px; border-top: 1px solid var(--border-color);">
+                <button class="btn btn-secondary js-diff-cancel">キャンセル</button>
+                <button class="btn btn-primary js-diff-apply">変更を適用</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 画像生成モーダル -->
+    <div class="modal-overlay js-image-modal" style="display: none;">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>画像生成</h3>
+                <button class="modal-close-btn js-image-modal-close">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">プロンプト</label>
+                    <textarea class="js-image-prompt" placeholder="生成したい画像の説明（例：青空の下でジョギングする女性）" rows="3" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; resize: vertical;"></textarea>
+                </div>
+                <div class="form-row" style="display: flex; gap: 12px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 500;">幅 (px)</label>
+                        <input type="number" class="js-image-width" value="1024" min="256" max="2048" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px;">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 500;">高さ (px)</label>
+                        <input type="number" class="js-image-height" value="768" min="256" max="2048" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px;">
+                    </div>
+                </div>
+                <div class="image-preview js-image-preview" style="margin-top: 16px; display: none;">
+                    <img src="" alt="生成画像" style="max-width: 100%; border-radius: 8px;">
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; padding: 16px 24px; border-top: 1px solid var(--border-color);">
+                <button class="btn btn-secondary js-image-cancel">キャンセル</button>
+                <button class="btn btn-primary js-image-generate">生成</button>
+                <button class="btn btn-primary js-image-insert" style="display: none;">LPに挿入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- テンプレートモーダル -->
+    <div class="modal-overlay js-template-modal" style="display: none;">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>テンプレート管理</h3>
+                <button class="modal-close-btn js-template-modal-close">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="template-save-section" style="margin-bottom: 24px; padding: 16px; background: var(--color-gray-50); border-radius: 8px;">
+                    <h4 style="margin-bottom: 12px; font-size: 14px;">現在のコードをテンプレートとして保存</h4>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" class="js-template-name" placeholder="テンプレート名" style="flex: 1; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px;">
+                        <button class="btn btn-primary js-template-save">保存</button>
+                    </div>
+                </div>
+                <div class="template-list-section">
+                    <h4 style="margin-bottom: 12px; font-size: 14px;">保存済みテンプレート</h4>
+                    <div class="template-list js-template-list">
+                        <!-- テンプレート一覧が動的に追加される -->
+                    </div>
                 </div>
             </div>
         </div>

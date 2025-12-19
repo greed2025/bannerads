@@ -1204,3 +1204,508 @@ function toggleFullscreen() {
         document.exitFullscreen();
     }
 }
+
+// ========================================
+// 差分表示モーダル
+// ========================================
+
+// 一時保存用の新コード
+let pendingCode = null;
+let activeDiffTab = 'html';
+
+function showDiffModal(newCode, diff) {
+    pendingCode = newCode;
+    
+    const modal = document.querySelector('.js-diff-modal');
+    if (!modal) {
+        // モーダルがない場合は従来のconfirmで代替
+        if (confirm('新しいコードが生成されました。適用しますか？')) {
+            applyNewCode(newCode);
+        }
+        return;
+    }
+    
+    modal.style.display = 'flex';
+    activeDiffTab = 'html';
+    
+    // タブ更新
+    modal.querySelectorAll('.diff-tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.diffTab === 'html');
+    });
+    
+    // 差分表示
+    renderDiffContent();
+    
+    // メッセージ
+    const messageEl = modal.querySelector('.js-diff-message');
+    if (messageEl) {
+        messageEl.textContent = 'AIが生成したコードの変更を確認してください。適用すると現在のコードが置き換わります。';
+    }
+    
+    // イベントリスナー設定
+    initDiffModalEvents();
+}
+
+function initDiffModalEvents() {
+    const modal = document.querySelector('.js-diff-modal');
+    if (!modal) return;
+    
+    // タブ切替
+    modal.querySelectorAll('.diff-tab-btn').forEach(btn => {
+        btn.onclick = () => {
+            activeDiffTab = btn.dataset.diffTab;
+            modal.querySelectorAll('.diff-tab-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.diffTab === activeDiffTab);
+            });
+            renderDiffContent();
+        };
+    });
+    
+    // キャンセル
+    modal.querySelector('.js-diff-cancel').onclick = () => {
+        hideDiffModal();
+    };
+    modal.querySelector('.js-diff-modal-close').onclick = () => {
+        hideDiffModal();
+    };
+    
+    // 適用
+    modal.querySelector('.js-diff-apply').onclick = () => {
+        applyNewCode(pendingCode);
+        hideDiffModal();
+    };
+}
+
+function renderDiffContent() {
+    const container = document.querySelector('.js-diff-content');
+    if (!container || !pendingCode) return;
+    
+    const currentCode = state.editors[activeDiffTab]?.getValue() || '';
+    const newCode = pendingCode[activeDiffTab] || '';
+    
+    // 簡易差分表示（行単位で比較）
+    const currentLines = currentCode.split('\n');
+    const newLines = newCode.split('\n');
+    
+    let diffHtml = '';
+    const maxLines = Math.max(currentLines.length, newLines.length);
+    
+    for (let i = 0; i < maxLines; i++) {
+        const oldLine = currentLines[i] || '';
+        const newLine = newLines[i] || '';
+        
+        if (oldLine === newLine) {
+            diffHtml += `<div style="color: #f8f8f2;">${escapeHtml(newLine) || '&nbsp;'}</div>`;
+        } else if (!oldLine && newLine) {
+            diffHtml += `<div style="color: #50fa7b; background: rgba(80, 250, 123, 0.1);">+ ${escapeHtml(newLine)}</div>`;
+        } else if (oldLine && !newLine) {
+            diffHtml += `<div style="color: #ff5555; background: rgba(255, 85, 85, 0.1);">- ${escapeHtml(oldLine)}</div>`;
+        } else {
+            diffHtml += `<div style="color: #ff5555; background: rgba(255, 85, 85, 0.1);">- ${escapeHtml(oldLine)}</div>`;
+            diffHtml += `<div style="color: #50fa7b; background: rgba(80, 250, 123, 0.1);">+ ${escapeHtml(newLine)}</div>`;
+        }
+    }
+    
+    container.innerHTML = diffHtml || '<div style="color: #999;">変更なし</div>';
+}
+
+function hideDiffModal() {
+    const modal = document.querySelector('.js-diff-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    pendingCode = null;
+}
+
+function applyNewCode(newCode) {
+    if (!newCode) return;
+    
+    // アンドゥ履歴に現在の状態を保存
+    if (newCode.html && state.editors.html) {
+        pushToUndoHistory('html', state.editors.html.getValue());
+        state.editors.html.setValue(newCode.html);
+    }
+    if (newCode.css && state.editors.css) {
+        pushToUndoHistory('css', state.editors.css.getValue());
+        state.editors.css.setValue(newCode.css);
+    }
+    if (newCode.js && state.editors.js) {
+        pushToUndoHistory('js', state.editors.js.getValue());
+        state.editors.js.setValue(newCode.js);
+    }
+    
+    updatePreview();
+    saveCurrentState();
+    showToast('コードを適用しました', 'success');
+}
+
+// ========================================
+// 画像生成モーダル
+// ========================================
+
+let generatedImageData = null;
+
+function showImageModal() {
+    const modal = document.querySelector('.js-image-modal');
+    if (!modal) {
+        showToast('画像生成モーダルが見つかりません', 'error');
+        return;
+    }
+    
+    modal.style.display = 'flex';
+    generatedImageData = null;
+    
+    // プレビュー非表示
+    const preview = modal.querySelector('.js-image-preview');
+    if (preview) {
+        preview.style.display = 'none';
+    }
+    
+    // ボタン状態リセット
+    modal.querySelector('.js-image-generate').style.display = 'inline-flex';
+    modal.querySelector('.js-image-insert').style.display = 'none';
+    
+    // イベントリスナー設定
+    initImageModalEvents();
+}
+
+function initImageModalEvents() {
+    const modal = document.querySelector('.js-image-modal');
+    if (!modal) return;
+    
+    // 閉じる
+    modal.querySelector('.js-image-modal-close').onclick = () => hideImageModal();
+    modal.querySelector('.js-image-cancel').onclick = () => hideImageModal();
+    
+    // 生成
+    modal.querySelector('.js-image-generate').onclick = async () => {
+        const prompt = modal.querySelector('.js-image-prompt')?.value?.trim();
+        if (!prompt) {
+            showToast('プロンプトを入力してください', 'warning');
+            return;
+        }
+        
+        const width = parseInt(modal.querySelector('.js-image-width')?.value) || 1024;
+        const height = parseInt(modal.querySelector('.js-image-height')?.value) || 768;
+        
+        showLoading();
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/lp/image`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt, width, height })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success && data.image) {
+                generatedImageData = data.image;
+                
+                // プレビュー表示
+                const preview = modal.querySelector('.js-image-preview');
+                const img = preview.querySelector('img');
+                img.src = `data:image/png;base64,${data.image}`;
+                preview.style.display = 'block';
+                
+                // ボタン切替
+                modal.querySelector('.js-image-generate').style.display = 'none';
+                modal.querySelector('.js-image-insert').style.display = 'inline-flex';
+                
+                showToast('画像を生成しました', 'success');
+            } else {
+                showToast(`画像生成に失敗: ${data.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Image generation error:', error);
+            showToast('画像生成に失敗しました', 'error');
+        } finally {
+            hideLoading();
+        }
+    };
+    
+    // LPに挿入
+    modal.querySelector('.js-image-insert').onclick = () => {
+        if (!generatedImageData || !state.currentProject) return;
+        
+        // ファイル名生成
+        const timestamp = Date.now();
+        const filename = `generated_${timestamp}.png`;
+        
+        // 画像をプロジェクトに追加
+        if (!state.currentProject.images) {
+            state.currentProject.images = [];
+        }
+        
+        state.currentProject.images.push({
+            name: filename,
+            dataUrl: `data:image/png;base64,${generatedImageData}`,
+            size: Math.round(generatedImageData.length * 0.75) // base64からバイト数概算
+        });
+        
+        // HTMLに画像タグを挿入
+        if (state.editors.html) {
+            const currentHtml = state.editors.html.getValue();
+            const imgTag = `<img src="img/${filename}" alt="生成画像" class="generated-image">`;
+            
+            // </body>の前に挿入
+            const newHtml = currentHtml.replace(
+                /(<\/body>)/i,
+                `    ${imgTag}\n$1`
+            );
+            
+            state.editors.html.setValue(newHtml);
+        }
+        
+        saveCurrentState();
+        updatePreview();
+        hideImageModal();
+        
+        showToast('画像をLPに挿入しました', 'success');
+    };
+}
+
+function hideImageModal() {
+    const modal = document.querySelector('.js-image-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    generatedImageData = null;
+}
+
+// ========================================
+// テンプレート管理
+// ========================================
+
+async function showTemplateModal() {
+    const modal = document.querySelector('.js-template-modal');
+    if (!modal) {
+        showToast('テンプレートモーダルが見つかりません', 'error');
+        return;
+    }
+    
+    modal.style.display = 'flex';
+    
+    // テンプレート一覧を読み込み
+    await loadTemplateList();
+    
+    // イベントリスナー設定
+    initTemplateModalEvents();
+}
+
+function initTemplateModalEvents() {
+    const modal = document.querySelector('.js-template-modal');
+    if (!modal) return;
+    
+    // 閉じる
+    modal.querySelector('.js-template-modal-close').onclick = () => hideTemplateModal();
+    
+    // テンプレート保存
+    modal.querySelector('.js-template-save').onclick = async () => {
+        const nameInput = modal.querySelector('.js-template-name');
+        const name = nameInput?.value?.trim();
+        
+        if (!name) {
+            showToast('テンプレート名を入力してください', 'warning');
+            return;
+        }
+        
+        if (!state.currentProject) {
+            showToast('プロジェクトを開いてください', 'warning');
+            return;
+        }
+        
+        const template = {
+            id: generateUUID(),
+            name: name,
+            files: {
+                html: state.currentProject.files.html,
+                css: state.currentProject.files.css,
+                js: state.currentProject.files.js
+            },
+            createdAt: new Date().toISOString()
+        };
+        
+        try {
+            await saveTemplate(template);
+            nameInput.value = '';
+            await loadTemplateList();
+            showToast('テンプレートを保存しました', 'success');
+        } catch (error) {
+            console.error('Failed to save template:', error);
+            showToast('テンプレートの保存に失敗しました', 'error');
+        }
+    };
+}
+
+async function loadTemplateList() {
+    const listContainer = document.querySelector('.js-template-list');
+    if (!listContainer) return;
+    
+    try {
+        const templates = await getTemplateList();
+        
+        if (templates.length === 0) {
+            listContainer.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">保存されたテンプレートはありません</p>';
+            return;
+        }
+        
+        listContainer.innerHTML = templates.map(t => `
+            <div class="template-item" style="display: flex; align-items: center; justify-content: space-between; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 8px;">
+                <div>
+                    <span style="font-weight: 500;">${escapeHtml(t.name)}</span>
+                    <span style="color: var(--color-gray-500); font-size: 12px; margin-left: 8px;">${formatDate(t.createdAt)}</span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary js-template-use" data-id="${t.id}" style="padding: 6px 12px; font-size: 12px;">使用</button>
+                    <button class="btn btn-secondary js-template-delete" data-id="${t.id}" style="padding: 6px 12px; font-size: 12px; color: var(--color-danger);">削除</button>
+                </div>
+            </div>
+        `).join('');
+        
+        // 使用ボタン
+        listContainer.querySelectorAll('.js-template-use').forEach(btn => {
+            btn.onclick = async () => {
+                const template = await getTemplate(btn.dataset.id);
+                if (template) {
+                    await createProjectFromTemplate(template);
+                }
+            };
+        });
+        
+        // 削除ボタン
+        listContainer.querySelectorAll('.js-template-delete').forEach(btn => {
+            btn.onclick = async () => {
+                if (confirm('このテンプレートを削除しますか？')) {
+                    await deleteTemplate(btn.dataset.id);
+                    await loadTemplateList();
+                    showToast('テンプレートを削除しました', 'success');
+                }
+            };
+        });
+    } catch (error) {
+        console.error('Failed to load templates:', error);
+        listContainer.innerHTML = '<p style="color: var(--color-danger);">読み込みに失敗しました</p>';
+    }
+}
+
+async function createProjectFromTemplate(template) {
+    const name = prompt('プロジェクト名を入力してください:', `${template.name}のコピー`);
+    if (!name) return;
+    
+    const project = {
+        id: generateUUID(),
+        name: name,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        files: {
+            html: template.files.html,
+            css: template.files.css,
+            js: template.files.js
+        },
+        images: [],
+        history: { html: [], css: [], js: [] },
+        chatHistory: []
+    };
+    
+    try {
+        await saveProject(project);
+        await openProject(project.id);
+        hideTemplateModal();
+        hideProjectModal();
+        showToast('テンプレートからプロジェクトを作成しました', 'success');
+    } catch (error) {
+        console.error('Failed to create project from template:', error);
+        showToast('プロジェクトの作成に失敗しました', 'error');
+    }
+}
+
+function hideTemplateModal() {
+    const modal = document.querySelector('.js-template-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// テンプレートDB操作
+async function saveTemplate(template) {
+    return new Promise((resolve, reject) => {
+        const transaction = state.db.transaction([STORE_TEMPLATES], 'readwrite');
+        const store = transaction.objectStore(STORE_TEMPLATES);
+        const request = store.put(template);
+        
+        request.onsuccess = () => resolve(true);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function getTemplateList() {
+    return new Promise((resolve, reject) => {
+        const transaction = state.db.transaction([STORE_TEMPLATES], 'readonly');
+        const store = transaction.objectStore(STORE_TEMPLATES);
+        const index = store.index('createdAt');
+        const request = index.openCursor(null, 'prev');
+        
+        const templates = [];
+        request.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (cursor) {
+                templates.push({
+                    id: cursor.value.id,
+                    name: cursor.value.name,
+                    createdAt: cursor.value.createdAt
+                });
+                cursor.continue();
+            } else {
+                resolve(templates);
+            }
+        };
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function getTemplate(id) {
+    return new Promise((resolve, reject) => {
+        const transaction = state.db.transaction([STORE_TEMPLATES], 'readonly');
+        const store = transaction.objectStore(STORE_TEMPLATES);
+        const request = store.get(id);
+        
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function deleteTemplate(id) {
+    return new Promise((resolve, reject) => {
+        const transaction = state.db.transaction([STORE_TEMPLATES], 'readwrite');
+        const store = transaction.objectStore(STORE_TEMPLATES);
+        const request = store.delete(id);
+        
+        request.onsuccess = () => resolve(true);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// ========================================
+// 追加のイベントリスナー
+// ========================================
+
+// DOMContentLoaded後に追加イベントを設定
+document.addEventListener('DOMContentLoaded', () => {
+    // 画像生成ボタン
+    document.querySelector('.js-image-btn')?.addEventListener('click', () => {
+        showImageModal();
+    });
+    
+    // テンプレートボタン
+    document.querySelector('.js-template-btn')?.addEventListener('click', () => {
+        showTemplateModal();
+    });
+    
+    // テンプレートから作成ボタン
+    document.querySelector('.js-template-select')?.addEventListener('click', () => {
+        hideProjectModal();
+        showTemplateModal();
+    });
+});
+
