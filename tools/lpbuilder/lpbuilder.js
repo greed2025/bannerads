@@ -1242,6 +1242,56 @@ function dataUrlToBlob(dataUrl) {
     }
 }
 
+/**
+ * 画像をWebP形式に変換
+ * @param {string} dataUrl - 元画像のdataUrl
+ * @param {number} quality - 画質 (0-1, デフォルト0.85)
+ * @returns {Promise<{dataUrl: string, blob: Blob}>}
+ */
+async function convertToWebP(dataUrl, quality = 0.85) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            
+            // WebPに変換
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        resolve({
+                            dataUrl: reader.result,
+                            blob: blob,
+                            size: blob.size
+                        });
+                    };
+                    reader.readAsDataURL(blob);
+                } else {
+                    // WebP非対応ブラウザはPNGで返す
+                    canvas.toBlob((pngBlob) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            resolve({
+                                dataUrl: reader.result,
+                                blob: pngBlob,
+                                size: pngBlob.size
+                            });
+                        };
+                        reader.readAsDataURL(pngBlob);
+                    }, 'image/png');
+                }
+            }, 'image/webp', quality);
+        };
+        img.onerror = () => reject(new Error('画像の読み込みに失敗しました'));
+        img.src = dataUrl;
+    });
+}
+
 function showToast(message, type = 'info') {
     const container = document.querySelector('.js-toast-container');
     if (!container) return;
@@ -1495,44 +1545,58 @@ function initImageModalEvents() {
         }
     };
     
-    // LPに挿入
-    modal.querySelector('.js-image-insert').onclick = () => {
+    // LPに挿入（WebP変換）
+    modal.querySelector('.js-image-insert').onclick = async () => {
         if (!generatedImageData || !state.currentProject) return;
         
-        // ファイル名生成
-        const timestamp = Date.now();
-        const filename = `generated_${timestamp}.png`;
+        showLoading();
         
-        // 画像をプロジェクトに追加
-        if (!state.currentProject.images) {
-            state.currentProject.images = [];
-        }
-        
-        state.currentProject.images.push({
-            name: filename,
-            dataUrl: `data:image/png;base64,${generatedImageData}`,
-            size: Math.round(generatedImageData.length * 0.75) // base64からバイト数概算
-        });
-        
-        // HTMLに画像タグを挿入
-        if (state.editors.html) {
-            const currentHtml = state.editors.html.getValue();
-            const imgTag = `<img src="img/${filename}" alt="生成画像" class="generated-image">`;
+        try {
+            // ファイル名生成
+            const timestamp = Date.now();
+            const filename = `generated_${timestamp}.webp`;
             
-            // </body>の前に挿入
-            const newHtml = currentHtml.replace(
-                /(<\/body>)/i,
-                `    ${imgTag}\n$1`
-            );
+            // WebP変換
+            const originalDataUrl = `data:image/png;base64,${generatedImageData}`;
+            const webpResult = await convertToWebP(originalDataUrl, 0.85);
             
-            state.editors.html.setValue(newHtml);
+            // 画像をプロジェクトに追加
+            if (!state.currentProject.images) {
+                state.currentProject.images = [];
+            }
+            
+            state.currentProject.images.push({
+                name: filename,
+                dataUrl: webpResult.dataUrl,
+                blob: webpResult.blob,
+                size: webpResult.size
+            });
+            
+            // HTMLに画像タグを挿入
+            if (state.editors.html) {
+                const currentHtml = state.editors.html.getValue();
+                const imgTag = `<img src="img/${filename}" alt="生成画像" class="generated-image">`;
+                
+                // </body>の前に挿入
+                const newHtml = currentHtml.replace(
+                    /(<\/body>)/i,
+                    `    ${imgTag}\n$1`
+                );
+                
+                state.editors.html.setValue(newHtml);
+            }
+            
+            saveCurrentState();
+            updatePreview();
+            hideImageModal();
+            
+            showToast('画像をWebPに変換してLPに挿入しました', 'success');
+        } catch (error) {
+            console.error('Image insert error:', error);
+            showToast('画像の挿入に失敗しました', 'error');
+        } finally {
+            hideLoading();
         }
-        
-        saveCurrentState();
-        updatePreview();
-        hideImageModal();
-        
-        showToast('画像をLPに挿入しました', 'success');
     };
 }
 
