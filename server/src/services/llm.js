@@ -54,7 +54,7 @@ async function withRetry(fn, maxRetries = 3, delay = 1000) {
 /**
  * Gemini画像生成（gemini-3-pro-image-preview）
  */
-async function generateImageWithGemini(prompt, count = 1, referenceImages = []) {
+async function generateImageWithGemini(prompt, count = 1, referenceImages = [], imageConfig = null) {
     if (!gemini) {
         throw new Error('Gemini APIが初期化されていません。GEMINI_API_KEYを確認してください。');
     }
@@ -91,12 +91,17 @@ async function generateImageWithGemini(prompt, count = 1, referenceImages = []) 
                 contents.push({ text: `${prompt}${japaneseInstruction}` });
             }
             
+            const config = {
+                responseModalities: ['Image', 'Text']
+            };
+            if (imageConfig) {
+                config.imageConfig = imageConfig;
+            }
+            
             const response = await gemini.models.generateContent({
                 model: 'gemini-3-pro-image-preview',
                 contents: contents,
-                config: {
-                    responseModalities: ['Image', 'Text']
-                }
+                config: config
             });
             
             // レスポンスから画像を抽出

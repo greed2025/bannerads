@@ -201,7 +201,7 @@
                     <!-- 設定パネル -->
                     <div class="generator-settings-panel" id="generatorSettingsPanel" style="display: none;">
                         <div class="settings-header">
-                            <span class="settings-title">生成画像サイズ</span>
+                            <span class="settings-title">生成設定</span>
                             <button class="settings-close-btn" id="settingsCloseBtn" title="閉じる">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <line x1="18" y1="6" x2="6" y2="18"/>
@@ -210,12 +210,22 @@
                             </button>
                         </div>
                         <div class="settings-content">
-                            <div class="size-presets">
-                                <button class="size-preset-btn active" data-width="512" data-height="512">512×512</button>
-                                <button class="size-preset-btn" data-width="768" data-height="768">768×768</button>
-                                <button class="size-preset-btn" data-width="1024" data-height="1024">1024×1024</button>
-                                <button class="size-preset-btn" data-width="1024" data-height="768">1024×768</button>
-                                <button class="size-preset-btn" data-width="768" data-height="1024">768×1024</button>
+                            <div class="settings-section">
+                                <label class="settings-label">生成枚数</label>
+                                <div class="count-presets">
+                                    <button class="count-preset-btn active" data-count="1">1枚</button>
+                                    <button class="count-preset-btn" data-count="2">2枚</button>
+                                    <button class="count-preset-btn" data-count="3">3枚</button>
+                                    <button class="count-preset-btn" data-count="4">4枚</button>
+                                </div>
+                            </div>
+                            <div class="settings-section">
+                                <label class="settings-label">画像サイズ</label>
+                                <div class="size-presets">
+                                    <button class="size-preset-btn active" data-width="1080" data-height="1080">1080×1080</button>
+                                    <button class="size-preset-btn" data-width="900" data-height="1600">900×1600</button>
+                                    <button class="size-preset-btn" data-width="628" data-height="1200">628×1200</button>
+                                </div>
                             </div>
                             <div class="custom-size">
                                 <label>カスタムサイズ</label>
@@ -227,7 +237,7 @@
                                 </div>
                             </div>
                             <div class="current-size-display">
-                                現在: <strong id="currentSizeDisplay">512×512</strong>
+                                現在: <strong id="currentSizeDisplay">1枚 / 1080×1080</strong>
                             </div>
                         </div>
                     </div>

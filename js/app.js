@@ -29,7 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const toolPaths = {
-        banner: 'tools/banner/banner.html',
         scenario: 'tools/scenario/scenario.html',
         mixboard: 'tools/mixboard/mixboard.html'
     };
@@ -79,10 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadProjectHistory(toolName) {
         let storageKey, listElement;
         
-        if (toolName === 'banner') {
-            storageKey = 'banner_projects';
-            listElement = document.getElementById('bannerProjectList');
-        } else if (toolName === 'scenario') {
+        if (toolName === 'scenario') {
             storageKey = 'scenario_projects';
             listElement = document.getElementById('scenarioProjectList');
         } else if (toolName === 'mixboard') {

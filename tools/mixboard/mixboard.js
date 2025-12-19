@@ -85,9 +85,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 生成画像サイズ
     let generatorSize = {
-        width: 512,
-        height: 512
+        width: 1080,
+        height: 1080
     };
+    
+    // 生成枚数（1〜4）
+    let generatorCount = 1;
     
     // 範囲選択状態
     let isSelecting = false;
@@ -433,12 +436,24 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         canvasContainer.style.outline = '';
         
-        const files = e.dataTransfer.files;
-        if (files.length > 0 && files[0].type.startsWith('image/')) {
-            const rect = canvasContainer.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / zoomScale;
-            const y = (e.clientY - rect.top) / zoomScale;
-            loadImageFile(files[0], x, y);
+        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+        if (files.length === 0) return;
+        
+        const rect = canvasContainer.getBoundingClientRect();
+        const baseX = (e.clientX - rect.left) / zoomScale;
+        const baseY = (e.clientY - rect.top) / zoomScale;
+        
+        // 複数ファイルをグリッド配置でアップロード
+        files.forEach((file, index) => {
+            const col = index % 3;
+            const row = Math.floor(index / 3);
+            const x = baseX + col * 320;
+            const y = baseY + row * 320;
+            loadImageFile(file, x, y);
+        });
+        
+        if (files.length > 1) {
+            showToast(`${files.length}枚の画像をアップロードしました`);
         }
     }
     
@@ -930,13 +945,35 @@ document.addEventListener('DOMContentLoaded', () => {
     function downloadElement() {
         if (selectedElementIds.length === 0) return;
         
-        selectedElementIds.forEach(id => {
+        selectedElementIds.forEach((id, index) => {
             const data = elements.find(e => e.id === id);
             if (data && data.type === 'image') {
+                // Base64をBlobに変換してダウンロード（プレビュー対応）
+                const base64 = data.src;
+                const mimeMatch = base64.match(/^data:([^;]+);base64,/);
+                const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+                const extension = mimeType.split('/')[1] || 'png';
+                
+                // Base64デコード
+                const byteString = atob(base64.split(',')[1]);
+                const ab = new ArrayBuffer(byteString.length);
+                const ia = new Uint8Array(ab);
+                for (let i = 0; i < byteString.length; i++) {
+                    ia[i] = byteString.charCodeAt(i);
+                }
+                const blob = new Blob([ab], { type: mimeType });
+                
+                // Blob URLでダウンロード
+                const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
-                link.download = `mixboard_${Date.now()}_${id}.png`;
-                link.href = data.src;
+                // 簡易ID生成（5文字）
+                const shortId = Math.random().toString(36).substr(2, 5).toUpperCase();
+                link.download = `MAI適用_${shortId}.${extension}`;
+                link.href = url;
                 link.click();
+                
+                // URL解放
+                setTimeout(() => URL.revokeObjectURL(url), 100);
             }
         });
     }
@@ -1081,12 +1118,19 @@ document.addEventListener('DOMContentLoaded', () => {
             box.style.height = rev.height + 'px';
             box.style.borderColor = rev.color;
             
-            // ラベル
+            // ラベル（全文表示）
             const label = document.createElement('div');
             label.className = 'revision-label';
             label.style.background = rev.color;
-            label.textContent = rev.comment.substring(0, 20) + (rev.comment.length > 20 ? '...' : '');
+            label.textContent = rev.comment || '';
             label.title = rev.comment;
+            
+            // 上部で見切れる場合（y < 40px）は下側に表示
+            if (rev.y < 40) {
+                label.style.bottom = 'auto';
+                label.style.top = 'calc(100% + 4px)';
+            }
+            
             box.appendChild(label);
             
             // 削除ボタン
@@ -1144,7 +1188,7 @@ ${instructions}
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     prompt: prompt,
-                    images: [annotatedImage],
+                    images: [annotatedImage, data.src],
                     width: data.width,
                     height: Math.round(data.width * (await getImageAspectRatio(data.src)))
                 })
@@ -1212,24 +1256,31 @@ ${instructions}
                     ctx.lineWidth = 4;
                     ctx.strokeRect(x, y, width, height);
                     
-                    // ラベル背景
+                    // ラベル背景（全文表示）
                     ctx.fillStyle = rev.color;
-                    const labelText = `修正${index + 1}: ${rev.comment}`;
+                    const labelText = `修正${index + 1}: ${rev.comment || ''}`;
                     ctx.font = 'bold 16px sans-serif';
                     const textMetrics = ctx.measureText(labelText);
-                    const labelWidth = Math.min(textMetrics.width + 16, width);
+                    const labelWidth = textMetrics.width + 16;
                     const labelHeight = 24;
+                    const labelMargin = 6;
                     
-                    ctx.fillRect(x, y - labelHeight, labelWidth, labelHeight);
+                    // 上部で見切れる場合（y < 40）は下側に表示
+                    let labelY, textY;
+                    if (rev.y * scaleY < 40) {
+                        labelY = y + height + labelMargin;
+                        textY = labelY + 17;
+                    } else {
+                        labelY = y - labelHeight - labelMargin;
+                        textY = y - labelMargin - 7;
+                    }
+                    
+                    ctx.fillRect(x, labelY, labelWidth, labelHeight);
                     
                     // ラベルテキスト
                     ctx.fillStyle = 'white';
                     ctx.font = 'bold 14px sans-serif';
-                    ctx.fillText(
-                        labelText.length > 30 ? labelText.substring(0, 30) + '...' : labelText,
-                        x + 8,
-                        y - 7
-                    );
+                    ctx.fillText(labelText, x + 8, textY);
                 });
                 
                 resolve(canvas.toDataURL('image/png'));
@@ -1320,53 +1371,73 @@ ${instructions}
             }
         });
         
-        // 生成中プレースホルダーを表示
-        const placeholderId = 'gen_' + Date.now();
-        const placeholder = createGeneratingPlaceholder(placeholderId);
-        canvasContainer.appendChild(placeholder);
+        // generatorCount分のプレースホルダーを表示
+        const placeholders = [];
+        for (let i = 0; i < generatorCount; i++) {
+            const col = i % 2;
+            const row = Math.floor(i / 2);
+            const x = 100 + col * 350;
+            const y = 100 + row * 350;
+            const placeholder = createGeneratingPlaceholder('gen_' + Date.now() + '_' + i, x, y, i + 1);
+            canvasContainer.appendChild(placeholder);
+            placeholders.push(placeholder);
+        }
         updateEmptyState();
         
         try {
-            // Mixboard専用の画像生成API（直接Gemini）
-            const response = await fetch(`${API_BASE_URL}/mixboard/generate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: text,
-                    images: selectedImages,
-                    count: 1,
-                    width: generatorSize.width,
-                    height: generatorSize.height
-                })
-            });
+            // generatorCount分の並列リクエスト
+            const requests = [];
+            for (let i = 0; i < generatorCount; i++) {
+                requests.push(
+                    fetch(`${API_BASE_URL}/mixboard/generate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            prompt: text,
+                            images: selectedImages,
+                            count: 1,
+                            width: generatorSize.width,
+                            height: generatorSize.height
+                        })
+                    }).then(res => res.json()).then(result => ({ result, index: i }))
+                      .catch(err => ({ error: err, index: i }))
+                );
+            }
             
-            const result = await response.json();
-            console.log('API Response:', JSON.stringify(result, null, 2)); // 詳細ログ
-            console.log('Response keys:', Object.keys(result));
+            const results = await Promise.all(requests);
             
             // プレースホルダーを削除
-            placeholder.remove();
+            placeholders.forEach(p => p.remove());
             
-            // 生成画像をキャンバスに追加（複数の応答形式に対応）
-            let images = result.generatedImages || result.images || [];
-            if (result.generatedImage) images = [result.generatedImage];
-            if (result.imageData) images = [result.imageData];
+            // 成功した画像をキャンバスに追加
+            let addedCount = 0;
+            results.forEach(({ result, error, index }) => {
+                if (error) return;
+                
+                let images = result.generatedImages || result.images || [];
+                if (result.generatedImage) images = [result.generatedImage];
+                if (result.imageData) images = [result.imageData];
+                
+                if (images.length > 0) {
+                    images.forEach((imgSrc) => {
+                        const col = addedCount % 2;
+                        const row = Math.floor(addedCount / 2);
+                        const x = 100 + col * 350;
+                        const y = 100 + row * 350;
+                        addImageElement(imgSrc, x, y, true);
+                        addedCount++;
+                    });
+                }
+            });
             
-            if (images.length > 0) {
-                images.forEach((imgSrc, index) => {
-                    addImageElement(imgSrc, 150 + index * 30, 150 + index * 30, true);
-                });
-                showToast('画像を生成しました');
-            } else if (result.message) {
-                // テキスト応答のみの場合、右チャットに追加
-                addChatMessage('assistant', result.message);
+            if (addedCount > 0) {
+                showToast(`${addedCount}枚の画像を生成しました`);
             } else {
                 showToast('画像を生成できませんでした', 'error');
-                console.log('No images in response:', result);
             }
         } catch (error) {
             console.error('Generator error:', error);
-            placeholder.remove();
+            placeholders.forEach(p => p.remove());
             showToast('画像生成中にエラーが発生しました', 'error');
         } finally {
             isGenerating = false;
@@ -1375,17 +1446,17 @@ ${instructions}
     }
     
     // 生成中プレースホルダー作成
-    function createGeneratingPlaceholder(id) {
+    function createGeneratingPlaceholder(id, x = 150, y = 150, num = null) {
         const placeholder = document.createElement('div');
         placeholder.id = id;
         placeholder.className = 'generating-placeholder';
-        placeholder.style.left = '150px';
-        placeholder.style.top = '150px';
+        placeholder.style.left = x + 'px';
+        placeholder.style.top = y + 'px';
         placeholder.style.width = '300px';
         placeholder.style.height = '300px';
         placeholder.innerHTML = `
             <div class="spinner"></div>
-            <span class="status-text">生成中...</span>
+            <span class="status-text">生成中${num ? ` (${num})` : ''}...</span>
         `;
         return placeholder;
     }
@@ -1432,11 +1503,18 @@ ${instructions}
         const settingsBtn = document.getElementById('settingsBtn');
         const settingsPanel = document.getElementById('generatorSettingsPanel');
         const settingsCloseBtn = document.getElementById('settingsCloseBtn');
+        const countPresetBtns = document.querySelectorAll('.count-preset-btn');
         const sizePresetBtns = document.querySelectorAll('.size-preset-btn');
         const customWidthInput = document.getElementById('customWidthInput');
         const customHeightInput = document.getElementById('customHeightInput');
         const applyCustomSizeBtn = document.getElementById('applyCustomSizeBtn');
         const currentSizeDisplay = document.getElementById('currentSizeDisplay');
+        
+        function updateDisplay() {
+            if (currentSizeDisplay) {
+                currentSizeDisplay.textContent = `${generatorCount}枚 / ${generatorSize.width}×${generatorSize.height}`;
+            }
+        }
         
         // 設定ボタンクリックでパネル開閉
         settingsBtn?.addEventListener('click', () => {
@@ -1453,6 +1531,16 @@ ${instructions}
             settingsBtn?.classList.remove('active');
         });
         
+        // 枚数プリセットボタン
+        countPresetBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                generatorCount = parseInt(btn.dataset.count);
+                countPresetBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                updateDisplay();
+            });
+        });
+        
         // プリセットサイズボタン
         sizePresetBtns.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -1466,10 +1554,7 @@ ${instructions}
                 sizePresetBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 
-                // 表示を更新
-                if (currentSizeDisplay) {
-                    currentSizeDisplay.textContent = `${width}×${height}`;
-                }
+                updateDisplay();
                 
                 // カスタム入力をクリア
                 if (customWidthInput) customWidthInput.value = '';
@@ -1493,10 +1578,7 @@ ${instructions}
             // プリセットのアクティブ状態を解除
             sizePresetBtns.forEach(b => b.classList.remove('active'));
             
-            // 表示を更新
-            if (currentSizeDisplay) {
-                currentSizeDisplay.textContent = `${width}×${height}`;
-            }
+            updateDisplay();
             
             showToast(`画像サイズを ${width}×${height} に設定しました`);
         });
@@ -1790,7 +1872,7 @@ ${instructions}
     // IndexedDB ストレージ
     // ========================================
     const DB_NAME = 'mixboard_db';
-    const DB_VERSION = 1;
+    const DB_VERSION = 3;
     const STORE_NAME = 'projects';
     
     function openDB() {

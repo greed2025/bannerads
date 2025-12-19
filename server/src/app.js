@@ -1,5 +1,5 @@
 /**
- * バナー作成ツール - AIバックエンドサーバー
+ * 仕事用ツール - AIバックエンドサーバー
  * リファクタリング版 - モジュール分割構成
  */
 
@@ -13,7 +13,6 @@ const { config } = require('./config');
 // ルーターインポート
 const chatRoutes = require('./routes/chat');
 const scenarioRoutes = require('./routes/scenario');
-const bannerRoutes = require('./routes/banner');
 
 // ミドルウェアインポート
 const { errorHandler, requestLogger } = require('./middleware/errorHandler');
@@ -47,7 +46,6 @@ app.get('/', (req, res) => {
 // APIルート登録（重複なし）
 app.use('/api/chat', chatRoutes);
 app.use('/api/scenario', scenarioRoutes);
-app.use('/api/banner', bannerRoutes);
 
 // ヘルスチェック（/api直下に配置）
 app.get('/api/health', (req, res) => {
@@ -62,6 +60,48 @@ app.get('/mixboard', (req, res) => {
     res.sendFile(path.join(config.paths.root, 'tools/mixboard/mixboard.html'));
 });
 
+const IMAGE_ASPECT_RATIOS = [
+    { label: '1:1', value: 1 },
+    { label: '2:3', value: 2 / 3 },
+    { label: '3:2', value: 3 / 2 },
+    { label: '3:4', value: 3 / 4 },
+    { label: '4:3', value: 4 / 3 },
+    { label: '9:16', value: 9 / 16 },
+    { label: '16:9', value: 16 / 9 },
+    { label: '21:9', value: 21 / 9 }
+];
+
+function buildImageConfig(width, height) {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+        return null;
+    }
+    
+    const ratio = width / height;
+    let best = IMAGE_ASPECT_RATIOS[0];
+    let bestDiff = Math.abs(ratio - best.value);
+    
+    for (const candidate of IMAGE_ASPECT_RATIOS.slice(1)) {
+        const diff = Math.abs(ratio - candidate.value);
+        if (diff < bestDiff) {
+            best = candidate;
+            bestDiff = diff;
+        }
+    }
+    
+    const maxDim = Math.max(width, height);
+    let imageSize = '1K';
+    if (maxDim > 2048) {
+        imageSize = '4K';
+    } else if (maxDim > 1024) {
+        imageSize = '2K';
+    }
+    
+    return {
+        aspectRatio: best.label,
+        imageSize: imageSize
+    };
+}
+
 // Mixboard専用 画像生成API（直接Geminiで生成）
 app.post('/api/mixboard/generate', async (req, res) => {
     try {
@@ -73,15 +113,19 @@ app.post('/api/mixboard/generate', async (req, res) => {
             });
         }
         
-        const { prompt, images = [], count = 1 } = req.body;
+        const { prompt, images = [], count = 1, width, height } = req.body;
         
         if (!prompt) {
             return res.status(400).json({ error: 'promptが必要です' });
         }
         
+        const parsedWidth = Number(width);
+        const parsedHeight = Number(height);
+        const imageConfig = buildImageConfig(parsedWidth, parsedHeight);
+        
         console.log(`🎨 Mixboard生成リクエスト: "${prompt.substring(0, 50)}...", 参考画像: ${images.length}枚`);
         
-        const generatedImages = await generateImageWithGemini(prompt, count, images);
+        const generatedImages = await generateImageWithGemini(prompt, count, images, imageConfig);
         
         res.json({
             success: true,
@@ -134,14 +178,12 @@ app.use(errorHandler);
 
 // サーバー起動
 app.listen(config.port, () => {
-    console.log(`🚀 Banner AI Server running on http://localhost:${config.port}`);
+    console.log(`🚀 Work Tools Server running on http://localhost:${config.port}`);
     console.log(`📝 API endpoints:`);
-    console.log(`   POST /api/chat - Chat with Claude (Banner)`);
+    console.log(`   POST /api/chat - Chat with Claude`);
     console.log(`   POST /api/scenario/chat - Chat with Claude (Scenario)`);
     console.log(`   POST /api/scenario/transcribe - Transcribe video`);
     console.log(`   GET  /api/scenario/list - List saved scenarios`);
-    console.log(`   GET  /api/banner/list - List favorite banners`);
-    console.log(`   POST /api/banner/save - Save favorite banner`);
     console.log(`   GET  /api/health - Health check`);
     
     const status = getClientStatus();

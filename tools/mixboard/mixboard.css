@@ -854,6 +854,43 @@ button {
     gap: 12px;
 }
 
+.settings-section {
+    margin-bottom: 12px;
+}
+
+.settings-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-gray-600);
+    margin-bottom: 6px;
+}
+
+.count-presets {
+    display: flex;
+    gap: 6px;
+}
+
+.count-preset-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-gray-600);
+    background: var(--color-gray-100);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.count-preset-btn:hover {
+    background: var(--color-gray-200);
+    color: var(--color-gray-800);
+}
+
+.count-preset-btn.active {
+    background: var(--color-accent);
+    color: white;
+}
+
 .size-presets {
     display: flex;
     flex-wrap: wrap;
@@ -1286,14 +1323,17 @@ button {
 
 .revision-label {
     position: absolute;
-    top: -28px;
+    bottom: calc(100% + 4px);
     left: 0;
     padding: 4px 10px;
     font-size: 11px;
     font-weight: 500;
     color: white;
     border-radius: 4px;
-    white-space: nowrap;
+    max-width: 100%;
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
     cursor: pointer;
 }
 

@@ -95,6 +95,58 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:${window.location.port || 3000}/api`;
 
     // ========================================
+    // XSSサニタイズユーティリティ
+    // ========================================
+    // 許可するHTMLタグの定義（マークダウンレンダリング用）
+    const ALLOWED_TAGS = ['br', 'p', 'strong', 'em', 'b', 'i', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'code', 'pre', 'blockquote'];
+    
+    /**
+     * XSS攻撃を防ぐためにHTMLをサニタイズ
+     * 許可されたタグのみを残し、危険な属性やスクリプトを除去
+     */
+    function sanitizeHtml(html) {
+        if (!html) return '';
+        
+        // まず全ての属性を除去するためにテキストを抽出
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        
+        // script, style, onイベント、javascript:を持つ要素を除去
+        const dangerous = temp.querySelectorAll('script, style, iframe, object, embed, form, input, button, link');
+        dangerous.forEach(el => el.remove());
+        
+        // すべてのイベントハンドラ属性を除去
+        const allElements = temp.querySelectorAll('*');
+        allElements.forEach(el => {
+            // 許可されていないタグは内容を残してタグを除去
+            if (!ALLOWED_TAGS.includes(el.tagName.toLowerCase())) {
+                const text = document.createTextNode(el.textContent);
+                el.parentNode.replaceChild(text, el);
+                return;
+            }
+            // 全ての属性を除去（安全側に倒す）
+            Array.from(el.attributes).forEach(attr => {
+                el.removeAttribute(attr.name);
+            });
+        });
+        
+        return temp.innerHTML;
+    }
+    
+    /**
+     * 純粋にテキストをエスケープ（HTMLとして解釈させない）
+     */
+    function escapeHtmlStrict(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // ========================================
     // LocalStorage 保存・読み込み
     // ========================================
     function saveToLocalStorage() {
@@ -196,6 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
             conversationHistory: [],
             chatMessages: '',
             scenarioType: 'short',
+            projectType: currentProjectType, // プロジェクトごとの案件タイプを保存
             markers: [],          // タブ別マーカー情報
             markerIdCounter: 0    // タブ別マーカーIDカウンター
         };
@@ -292,6 +345,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function restoreProjectState() {
         const project = getCurrentProject();
         if (!project) return;
+        
+        // プロジェクトのprojectTypeを復元（存在しない場合はデフォルト値）
+        if (project.projectType) {
+            currentProjectType = project.projectType;
+            // セレクトボックスを同期
+            if (projectSelectLeft) projectSelectLeft.value = currentProjectType;
+            if (projectSelectChat) projectSelectChat.value = currentProjectType;
+        }
         
         if (project.chatMessages) {
             chatMessages.innerHTML = project.chatMessages;
@@ -411,9 +472,12 @@ document.addEventListener('DOMContentLoaded', () => {
         contentDiv.className = 'message-content';
         
         if (isMarkdown) {
-            contentDiv.innerHTML = `<p>${content.replace(/\n/g, '<br>')}</p>`;
+            // Markdownの場合: 改行をbrに変換してからサニタイズ
+            const htmlContent = escapeHtmlStrict(content).replace(/\n/g, '<br>');
+            contentDiv.innerHTML = `<p>${htmlContent}</p>`;
         } else {
-            contentDiv.innerHTML = `<p>${escapeHtml(content)}</p>`;
+            // 通常テキストの場合: 完全にエスケープ
+            contentDiv.innerHTML = `<p>${escapeHtmlStrict(content)}</p>`;
         }
         
         messageDiv.appendChild(contentDiv);
@@ -494,7 +558,23 @@ document.addEventListener('DOMContentLoaded', () => {
             thinkingDiv.remove();
 
             if (!response.ok) {
-                throw new Error('API error');
+                // エラーステータス別のメッセージ
+                const errorData = await response.json().catch(() => ({}));
+                let errorMessage = 'エラーが発生しました。';
+                
+                if (response.status === 503) {
+                    errorMessage = 'Claude APIが初期化されていません。APIキーを確認してください。';
+                } else if (response.status === 400) {
+                    errorMessage = '入力を確認してください。';
+                } else if (response.status === 500) {
+                    errorMessage = 'サーバーエラーが発生しました。';
+                }
+                
+                if (errorData.error) {
+                    errorMessage = errorData.error;
+                }
+                
+                throw new Error(errorMessage);
             }
 
             const data = await response.json();
@@ -502,8 +582,17 @@ document.addEventListener('DOMContentLoaded', () => {
             addMessage('assistant', data.message, true);
             
             if (data.scenario) {
-                project.content = data.scenario;
-                renderScenarioContent(data.scenario);
+                // scenarioが配列の場合は文字列に変換
+                let scenarioContent;
+                if (Array.isArray(data.scenario)) {
+                    // 配列の場合: 各シナリオを「---」で結合
+                    scenarioContent = data.scenario.map((s, i) => `【シナリオ${i + 1}】\n${s}`).join('\n---\n');
+                } else {
+                    // 文字列の場合: そのまま使用
+                    scenarioContent = data.scenario;
+                }
+                project.content = scenarioContent;
+                renderScenarioContent(scenarioContent);
             }
             
             saveToLocalStorage();
@@ -515,7 +604,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 addMessage('assistant', '⏹️ 生成を中断しました。');
             } else {
                 console.error('チャットエラー:', error);
-                addMessage('assistant', 'すみません、エラーが発生しました。サーバーが起動しているか確認してください。');
+                addMessage('assistant', `すみません、${error.message || 'エラーが発生しました。サーバーが起動しているか確認してください。'}`);
             }
         } finally {
             isProcessing = false;
@@ -613,7 +702,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                     <div class="scenario-card-content scenario-editable" id="scenarioText-0" contenteditable="true" data-idx="0">
-                        ${content.replace(/\n/g, '<br>')}
+                        ${escapeHtmlStrict(content).replace(/\n/g, '<br>')}
                     </div>
                 </div>
             `;
@@ -658,7 +747,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
                         <div class="scenario-card-content scenario-editable" id="scenarioText-${idx}" contenteditable="true" data-idx="${idx}">
-                            ${cleanedScenario.replace(/\n/g, '<br>')}
+                            ${escapeHtmlStrict(cleanedScenario).replace(/\n/g, '<br>')}
                         </div>
                     </div>
                 `;
@@ -1502,12 +1591,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function addMarker(type, text, range) {
         const markerId = ++markerIdCounter;
         
+        // rangeからシナリオカードのインデックスを取得
+        const scenarioCard = range.startContainer.parentElement?.closest('.scenario-card');
+        const scenarioIndex = scenarioCard ? parseInt(scenarioCard.dataset.index) || 0 : 0;
+        
         const markerData = {
             id: markerId,
             type: type,
             text: text,
             instruction: '',
-            scenarioIndex: getCurrentScenarioIndex()
+            scenarioIndex: scenarioIndex
         };
         
         // テキストにハイライトを適用
@@ -1535,45 +1628,44 @@ document.addEventListener('DOMContentLoaded', () => {
         updateMarkerUI();
     }
     
-    // 現在のシナリオインデックスを取得
-    function getCurrentScenarioIndex() {
-        const project = getCurrentProject();
-        if (!project || !project.content) return 0;
-        const scenarios = project.content.split(/\n---\n/).filter(s => s.trim());
-        return scenarios.length > 1 ? 0 : 0; // デフォルトは最初のシナリオ
-    }
-    
     // マーカーハイライトをDOMに再適用
     function restoreMarkerHighlights() {
         // マーカーがない場合は何もしない
         if (markersList.length === 0) return;
         
         // 各シナリオのテキストエリアを走査
-        const scenarioCards = document.querySelectorAll('.scenario-card-content');
+        const scenarioCards = document.querySelectorAll('.scenario-card');
         
         markersList.forEach(marker => {
-            // 各シナリオカード内でマーカーテキストを検索
-            scenarioCards.forEach(card => {
-                const textContent = card.innerHTML;
-                
-                // 既にハイライトされていないか確認
-                if (textContent.includes(`data-marker-id="${marker.id}"`)) return;
-                
-                // テキストを検索して置換
-                const escapedText = marker.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const regex = new RegExp(`(${escapedText})(?![^<]*>)`, 'g');
-                
-                let found = false;
-                const newContent = textContent.replace(regex, (match) => {
-                    if (found) return match; // 最初のマッチのみ置換
-                    found = true;
-                    return `<span class="marker-highlight marker-${marker.type}" data-marker-id="${marker.id}">${match}</span>`;
-                });
-                
-                if (found) {
-                    card.innerHTML = newContent;
-                }
+            // マーカーに紐付いたシナリオカードを取得
+            const targetCard = Array.from(scenarioCards).find(
+                card => parseInt(card.dataset.index) === marker.scenarioIndex
+            );
+            
+            if (!targetCard) return;
+            
+            const cardContent = targetCard.querySelector('.scenario-card-content');
+            if (!cardContent) return;
+            
+            const textContent = cardContent.innerHTML;
+            
+            // 既にハイライトされていないか確認
+            if (textContent.includes(`data-marker-id="${marker.id}"`)) return;
+            
+            // テキストを検索して置換
+            const escapedText = marker.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(${escapedText})(?![^<]*>)`, 'g');
+            
+            let found = false;
+            const newContent = textContent.replace(regex, (match) => {
+                if (found) return match; // 最初のマッチのみ置換
+                found = true;
+                return `<span class="marker-highlight marker-${marker.type}" data-marker-id="${marker.id}">${match}</span>`;
             });
+            
+            if (found) {
+                cardContent.innerHTML = newContent;
+            }
         });
     }
     

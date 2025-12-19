@@ -52,7 +52,6 @@ const config = {
         server: path.resolve(__dirname, '../..'),
         knowledge: path.resolve(__dirname, '../../knowledge'),
         skills: path.resolve(__dirname, '../../skills'),
-        banners: path.resolve(__dirname, '../../banners'),
         scenarios: path.resolve(__dirname, '../../scenarios'),
         uploads: path.resolve(__dirname, '../../uploads'),
     },
