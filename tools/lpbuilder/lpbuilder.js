@@ -32,6 +32,7 @@ const state = {
     undoHistory: { html: [], css: [], js: [] },
     redoHistory: { html: [], css: [], js: [] },
     isSaving: false,
+    isLoading: false, // ロード中フラグ（変更検知無効化用）
     saveTimeout: null
 };
 
@@ -302,12 +303,21 @@ async function loadActiveTabProject() {
  * プロジェクトをエディタに読み込み
  */
 function loadProjectToEditors(project) {
-    // 一時的に変更検知を無効化
-    const isLoading = true;
+    // ロード中フラグON（変更検知無効化）
+    state.isLoading = true;
     
     const htmlContent = project.files?.html || '';
     const cssContent = project.files?.css || '';
     const jsContent = project.files?.js || '';
+    
+    // previousValuesを先に初期化（setValue前に設定）
+    previousValues.html = htmlContent;
+    previousValues.css = cssContent;
+    previousValues.js = jsContent;
+    
+    // Undo/Redo履歴をリセット
+    state.undoHistory = { html: [], css: [], js: [] };
+    state.redoHistory = { html: [], css: [], js: [] };
     
     if (state.editors.html) {
         state.editors.html.setValue(htmlContent);
@@ -319,16 +329,13 @@ function loadProjectToEditors(project) {
         state.editors.js.setValue(jsContent);
     }
     
-    // previousValuesを初期化（ダーティ誤判定防止）
-    previousValues.html = htmlContent;
-    previousValues.css = cssContent;
-    previousValues.js = jsContent;
-    
     // エディタをリフレッシュ（新しいレイアウトで表示を更新）
     setTimeout(() => {
         state.editors.html?.refresh();
         state.editors.css?.refresh();
         state.editors.js?.refresh();
+        // ロード中フラグOFF
+        state.isLoading = false;
     }, 50);
     
     // チャット履歴復元
@@ -815,6 +822,9 @@ function initEditors() {
 const previousValues = { html: '', css: '', js: '' };
 
 function handleEditorChange(type) {
+    // ロード中は変更検知を無効化
+    if (state.isLoading) return;
+    
     // 現在の値取得
     const currentValue = state.editors[type]?.getValue() || '';
     
@@ -1818,30 +1828,21 @@ async function openProject(id) {
         }
         
         state.currentProject = project;
-        state.chatHistory = project.chatHistory || [];
-        state.undoHistory = project.history || { html: [], css: [], js: [] };
-        state.redoHistory = { html: [], css: [], js: [] };
         
-        // UIに反映（タブ名更新）
+        // アクティブタブのprojectIdを更新
         const activeTabId = state.tabManager.getActiveTabId();
-        state.tabManager.renameTab(activeTabId, project.name);
+        const activeTab = state.tabManager.getTabs().find(t => t.id === activeTabId);
+        if (activeTab) {
+            activeTab.projectId = project.id;
+            state.tabManager.renameTab(activeTabId, project.name);
+        }
+        
+        // エディタに読み込み（isLoading, previousValues, Undo/Redo全てリセット）
+        loadProjectToEditors(project);
+        
+        // タブ状態を保存
+        saveTabState();
         renderProjectTabs();
-        
-        // エディタに反映
-        if (state.editors.html) state.editors.html.setValue(project.files.html || '');
-        if (state.editors.css) state.editors.css.setValue(project.files.css || '');
-        if (state.editors.js) state.editors.js.setValue(project.files.js || '');
-        
-        // 変更検知用の前回値を初期化
-        previousValues.html = project.files.html || '';
-        previousValues.css = project.files.css || '';
-        previousValues.js = project.files.js || '';
-        
-        // チャット履歴を反映
-        renderChatHistory();
-        
-        // プレビュー更新
-        updatePreview();
         
         // モーダル閉じる
         hideProjectModal();
