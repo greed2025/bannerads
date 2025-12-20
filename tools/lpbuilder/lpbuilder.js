@@ -70,9 +70,6 @@ async function initializeApp() {
         showToast('初期化に失敗しました', 'error');
     }
 }
-        showToast('初期化に失敗しました', 'error');
-    }
-}
 
 // ========================================
 // IndexedDB管理
