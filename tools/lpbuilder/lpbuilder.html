@@ -109,7 +109,7 @@
                 </div>
             </div>
             
-            <!-- 右側: プレビューエリア -->
+            <!-- 中央: プレビューエリア -->
             <div class="preview-area">
                 <div class="preview-header">
                     <span class="preview-title">プレビュー</span>
@@ -132,27 +132,6 @@
                 </div>
             </div>
 
-                <!-- AI修正指示パネル -->
-                <div class="ai-instruction-panel">
-                    <div class="instruction-input-wrapper">
-                        <button class="apply-code-btn js-apply-code-btn" title="コードをAIに送信">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="16 18 22 12 16 6"/>
-                                <polyline points="8 6 2 12 8 18"/>
-                            </svg>
-                        </button>
-                        <input type="text" class="instruction-input js-instruction-input" placeholder="修正指示を入力（例：ヘッダーの色を青に変更）">
-                        <button class="send-instruction-btn js-send-instruction-btn" title="AIに修正指示を送信">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <polyline points="12 16 16 12 12 8"/>
-                                <line x1="8" y1="12" x2="16" y2="12"/>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
             <!-- 右パネル: AIチャット -->
             <aside class="right-panel js-right-panel">
                 <button class="panel-toggle-btn right js-right-panel-toggle" title="パネル開閉">
@@ -161,15 +140,27 @@
                     </svg>
                 </button>
                 <div class="panel-content">
-                    <div class="panel-header">
-                        <h2>AIアシスタント</h2>
-                        <button class="clear-chat-btn js-clear-chat" title="チャット履歴をクリア">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="3 6 5 6 21 6"/>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                            </svg>
-                        </button>
+                    <!-- プロジェクト履歴セクション -->
+                    <div class="project-history-section">
+                        <div class="panel-header">
+                            <h2>プロジェクト履歴</h2>
+                        </div>
+                        <div class="project-history-list js-project-history-list">
+                            <!-- JSで動的に生成 -->
+                        </div>
                     </div>
+                    
+                    <!-- AIアシスタントセクション -->
+                    <div class="ai-chat-section">
+                        <div class="panel-header">
+                            <h2>AIアシスタント</h2>
+                            <button class="clear-chat-btn js-clear-chat" title="チャット履歴をクリア">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"/>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                </svg>
+                            </button>
+                        </div>
                     <div class="chat-messages js-chat-messages">
                         <div class="chat-message assistant">
                             <div class="message-avatar">
@@ -198,6 +189,7 @@
                                 <polygon points="22 2 15 22 11 13 2 9 22 2"/>
                             </svg>
                         </button>
+                    </div>
                     </div>
                 </div>
             </aside>

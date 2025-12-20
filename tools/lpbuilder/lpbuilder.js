@@ -205,7 +205,7 @@ async function restoreTabsOrCreateNew() {
             const validTabs = [];
             for (const tab of state.tabManager.getTabs()) {
                 if (tab.projectId) {
-                    const project = await getProject(tab.projectId);
+                    const project = await loadProject(tab.projectId);
                     if (project) {
                         validTabs.push(tab);
                     }
@@ -236,6 +236,7 @@ async function restoreTabsOrCreateNew() {
         
         // タブUI更新
         renderProjectTabs();
+        renderProjectHistory();
         saveTabState();
         
     } catch (error) {
@@ -243,6 +244,7 @@ async function restoreTabsOrCreateNew() {
         // エラー時も新規タブ作成
         await createNewProjectTab();
         renderProjectTabs();
+        renderProjectHistory();
     }
 }
 
@@ -278,7 +280,7 @@ async function loadActiveTabProject() {
     const activeTab = state.tabManager.getTabs().find(t => t.id === state.tabManager.activeTabId);
     if (!activeTab || !activeTab.projectId) return;
     
-    const project = await getProject(activeTab.projectId);
+    const project = await loadProject(activeTab.projectId);
     if (project) {
         state.currentProject = project;
         loadProjectToEditors(project);
@@ -327,7 +329,7 @@ function renderProjectTabs() {
     
     tabList.innerHTML = tabs.map(tab => `
         <div class="project-tab ${tab.id === activeTabId ? 'active' : ''}" data-tab-id="${tab.id}">
-            <span class="project-tab-name">${escapeHtml(tab.name)}</span>
+            <span class="project-tab-name" data-tab-id="${tab.id}">${escapeHtml(tab.name)}</span>
             ${tab.isDirty ? '<span class="project-tab-dirty"></span>' : ''}
             <button class="project-tab-close" data-tab-id="${tab.id}">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -347,9 +349,19 @@ function renderProjectTabs() {
     tabList.querySelectorAll('.project-tab').forEach(tabEl => {
         tabEl.addEventListener('click', async (e) => {
             if (e.target.closest('.project-tab-close')) return;
+            if (e.target.classList.contains('project-tab-name-input')) return;
             
             const tabId = tabEl.dataset.tabId;
             await switchToTab(tabId);
+        });
+    });
+    
+    // タブ名ダブルクリックで編集
+    tabList.querySelectorAll('.project-tab-name').forEach(nameEl => {
+        nameEl.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            const tabId = nameEl.dataset.tabId;
+            startEditTabName(tabId, nameEl);
         });
     });
     
@@ -360,6 +372,62 @@ function renderProjectTabs() {
             const tabId = btn.dataset.tabId;
             await closeProjectTab(tabId);
         });
+    });
+}
+
+/**
+ * タブ名編集を開始
+ */
+function startEditTabName(tabId, nameEl) {
+    const currentName = nameEl.textContent;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'project-tab-name-input';
+    input.value = currentName;
+    input.style.cssText = `
+        width: 100px;
+        background: var(--color-white);
+        border: 1px solid var(--color-primary);
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-size: 12px;
+        outline: none;
+    `;
+    
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+    
+    const finishEdit = async () => {
+        const newName = input.value.trim() || currentName;
+        
+        // タブ名を更新
+        state.tabManager.renameTab(tabId, newName);
+        
+        // プロジェクト名も更新
+        const tab = state.tabManager.getTabs().find(t => t.id === tabId);
+        if (tab && tab.projectId) {
+            const project = await loadProject(tab.projectId);
+            if (project) {
+                project.name = newName;
+                await saveProject(project);
+            }
+        }
+        
+        saveTabState();
+        renderProjectTabs();
+    };
+    
+    input.addEventListener('blur', finishEdit);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            input.blur();
+        }
+        if (e.key === 'Escape') {
+            input.value = currentName;
+            input.blur();
+        }
     });
 }
 
@@ -406,6 +474,7 @@ async function closeProjectTab(tabId) {
     await loadActiveTabProject();
     
     renderProjectTabs();
+    renderProjectHistory();
     saveTabState();
 }
 
@@ -415,6 +484,96 @@ async function closeProjectTab(tabId) {
 function saveTabState() {
     const data = state.tabManager.serialize();
     localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(data));
+}
+
+/**
+ * プロジェクト履歴を表示
+ */
+async function renderProjectHistory() {
+    const listEl = document.querySelector('.js-project-history-list');
+    if (!listEl) return;
+    
+    try {
+        const projects = await getProjectList();
+        
+        // 現在開いているタブのプロジェクトIDを取得
+        const openProjectIds = state.tabManager.getTabs().map(t => t.projectId);
+        
+        // 開いていないプロジェクトのみ表示（履歴）
+        const historyProjects = projects.filter(p => !openProjectIds.includes(p.id));
+        
+        if (historyProjects.length === 0) {
+            listEl.innerHTML = '<div class="project-history-empty">履歴がありません</div>';
+            return;
+        }
+        
+        listEl.innerHTML = historyProjects.map(project => `
+            <div class="project-history-item" data-project-id="${project.id}">
+                <span class="project-history-name">${escapeHtml(project.name)}</span>
+                <span class="project-history-date">${formatShortDate(project.updatedAt)}</span>
+            </div>
+        `).join('');
+        
+        // クリックイベント（履歴からタブを開く）
+        listEl.querySelectorAll('.project-history-item').forEach(item => {
+            item.addEventListener('click', async () => {
+                const projectId = item.dataset.projectId;
+                await openProjectAsNewTab(projectId);
+            });
+        });
+        
+    } catch (error) {
+        console.error('Failed to load project history:', error);
+        listEl.innerHTML = '<div class="project-history-empty">読み込みエラー</div>';
+    }
+}
+
+/**
+ * 履歴からプロジェクトを新規タブで開く
+ */
+async function openProjectAsNewTab(projectId) {
+    // タブ数チェック
+    if (state.tabManager.getTabs().length >= 5) {
+        showToast('タブは最大5つまでです', 'warning');
+        return;
+    }
+    
+    const project = await loadProject(projectId);
+    if (!project) {
+        showToast('プロジェクトが見つかりません', 'error');
+        return;
+    }
+    
+    // タブ作成
+    const tab = state.tabManager.createTab(project.name, project.id);
+    if (!tab) return;
+    
+    // プロジェクトを読み込み
+    state.currentProject = project;
+    loadProjectToEditors(project);
+    
+    renderProjectTabs();
+    renderProjectHistory();
+    saveTabState();
+}
+
+/**
+ * 短い日付フォーマット
+ */
+function formatShortDate(isoString) {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const now = new Date();
+    const diff = now - date;
+    
+    if (diff < 86400000) { // 24時間以内
+        return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    } else if (diff < 604800000) { // 1週間以内
+        const days = Math.floor(diff / 86400000);
+        return `${days}日前`;
+    } else {
+        return date.toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' });
+    }
 }
 
 /**
