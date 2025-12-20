@@ -953,11 +953,11 @@ button {
 
 /* スマホフレーム */
 .smartphone-frame {
-    width: 280px;
-    height: 580px;
+    width: 375px;
+    height: 812px;
     background: #1a1a1a;
-    border-radius: 32px;
-    padding: 8px;
+    border-radius: 40px;
+    padding: 10px;
     box-shadow: 
         0 0 0 2px #333,
         0 15px 40px rgba(0, 0, 0, 0.25);
