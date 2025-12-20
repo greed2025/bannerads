@@ -1,292 +1,241 @@
-# LP Builder 機能追加実装レポート
-**作成日**: 2025年12月20日  
-**レビュー依頼者**: 開発担当  
+# LP Builder レビュー指摘対応レポート
+**作成日**: 2025年12月20日
+**対応完了**: 全8件
 
 ---
 
-## 概要
+## 対応サマリー
 
-LP Builderツールに対して、UI/UXの改善と新機能を実装しました。本ドキュメントでは実装内容、技術的詳細、および今後の課題について説明します。
-
----
-
-## 実装内容一覧
-
-| No | 機能 | 状態 | 優先度 |
+| 指摘 | 優先度 | 対応内容 | ステータス |
 |---|---|---|---|
-| 1 | タブ名ダブルクリック編集 | ✅ 完了 | 高 |
-| 2 | PC/スマホプレビュー切替 | ✅ 完了 | 高 |
-| 3 | コードエディタ開閉機能 | ✅ 完了 | 中 |
-| 4 | プレビュー内ツールバー | ✅ 完了 | 高 |
-| 5 | プレビュー要素選択修正 | ✅ UI完了 | 高 |
-| 6 | 画像生成機能 | ✅ UI完了 | 中 |
+| iframe sandbox | 高 | `allow-same-origin` 追加 | ✅ 完了 |
+| ダーティ誤判定 | 高 | `previousValues` 初期化追加 | ✅ 完了 |
+| 最終タブ閉鎖不整合 | 高 | 新規プロジェクト自動作成 | ✅ 完了 |
+| .js-project-name参照 | 高 | タブ名更新に修正 | ✅ 完了 |
+| ZIP出力パス不整合 | 中 | css/, js/ パスに統一 | ✅ 完了 |
+| APIエンドポイント不一致 | 中 | 3エンドポイント追加 | ✅ 完了 |
+| 画像タグinline style | 中 | クラス名に変更 | ✅ 完了 |
+| 選択モード再有効化 | 追加 | iframe load後に再登録 | ✅ 完了 |
 
 ---
 
-## 1. タブ名ダブルクリック編集
+## 詳細対応内容
 
-### 仕様
-- **操作**: タブ名をダブルクリック → インライン編集モードに移行
-- **確定**: Enter キー または フォーカス外れ
-- **キャンセル**: Escape キー
+### 1. iframe sandbox修正（高）
 
-### 技術実装
-```javascript
-// ダブルクリックでcontentEditable有効化
-nameEl.addEventListener('dblclick', (e) => {
-    nameEl.contentEditable = 'true';
-    nameEl.focus();
-    // テキスト全選択
-});
+**問題**: `sandbox="allow-scripts"` のみでは `contentDocument` にアクセスできない
 
-// blur時に保存
-nameEl.addEventListener('blur', async () => {
-    nameEl.contentEditable = 'false';
-    await saveTabName(tabId, nameEl.textContent.trim());
-});
-```
-
-### 変更ファイル
-- `lpbuilder.js`: `renderProjectTabs()`, `saveTabName()` 関数
-
----
-
-## 2. PC/スマホプレビュー切替
-
-### 仕様
-- プレビューヘッダーにスマホアイコン/PCアイコンのトグルボタン
-- **スマホモード**: iPhone風フレーム内にプレビュー表示
-- **PCモード**: フル幅でプレビュー表示（比率維持）
-
-### 技術実装
-```javascript
-function setPreviewMode(mode) {
-    // ボタン状態更新
-    document.querySelectorAll('.js-preview-mode-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.mode === mode);
-    });
-    
-    // data-mode属性でCSS制御
-    const wrapper = document.querySelector('.js-preview-wrapper');
-    wrapper.dataset.mode = mode;
-    
-    updatePreview();
-}
-```
-
-### CSSによる表示制御
-```css
-.preview-wrapper[data-mode="desktop"] .smartphone-frame {
-    display: none;
-}
-.preview-wrapper[data-mode="desktop"] .desktop-frame {
-    display: block !important;
-}
-```
-
-### 変更ファイル
-- `lpbuilder.html`: プレビューモードボタン追加
-- `lpbuilder.css`: デスクトップフレームスタイル
-- `lpbuilder.js`: `setPreviewMode()` 関数
-
----
-
-## 3. コードエディタ開閉機能
-
-### 仕様
-- エディタエリア右端にトグルボタン（➤）配置
-- クリックでエディタエリアを完全に閉じる（width: 0）
-- 再クリックで展開
-
-### 技術実装
-```css
-.editors-area.collapsed {
-    width: 0;
-    overflow: hidden;
-    border-right: none;
-}
-```
-
-```javascript
-document.querySelector('.js-editors-toggle')?.addEventListener('click', () => {
-    editorsArea?.classList.toggle('collapsed');
-    // 展開後にCodeMirrorをリフレッシュ
-    setTimeout(() => {
-        state.editors.html?.refresh();
-        state.editors.css?.refresh();
-        state.editors.js?.refresh();
-    }, 300);
-});
-```
-
-### 変更ファイル
-- `lpbuilder.html`: トグルボタン追加
-- `lpbuilder.css`: collapsed状態のスタイル
-- `lpbuilder.js`: トグルイベントリスナー
-
----
-
-## 4. プレビュー内ツールバー
-
-### 仕様
-- プレビューエリア下部にツールバー配置
-- 「選択修正」「画像生成」ボタン
-
-### HTML構造
+**解決**:
 ```html
-<div class="preview-toolbar">
-    <button class="preview-tool-btn js-preview-select-btn">
-        <svg>...</svg>
-        <span>選択修正</span>
-    </button>
-    <button class="preview-tool-btn js-preview-image-btn">
-        <svg>...</svg>
-        <span>画像生成</span>
-    </button>
-</div>
+<!-- Before -->
+<iframe sandbox="allow-scripts">
+
+<!-- After -->
+<iframe sandbox="allow-scripts allow-same-origin">
 ```
 
-### 変更ファイル
-- `lpbuilder.html`: ツールバーHTML追加
-- `lpbuilder.css`: ツールバースタイル
+**変更ファイル**: `lpbuilder.html:176, 182`
 
 ---
 
-## 5. プレビュー要素選択修正
+### 2. ダーティ誤判定防止（高）
 
-### 仕様
-1. 「選択修正」ボタンクリック → 選択モードON（ボタン青色）
-2. プレビュー（iframe）内の要素にホバー → 青枠でハイライト
-3. クリックで要素選択 → 編集パネル表示
-4. 修正指示入力 → 「修正を適用」ボタン
+**問題**: `loadProjectToEditors` で `setValue` 時に `previousValues` が未初期化のため即座にダーティ化
 
-### 技術実装
-
-#### iframe内イベント登録
+**解決**:
 ```javascript
-function enablePreviewSelection() {
-    [mobileIframe, desktopIframe].forEach(iframe => {
-        const iframeDoc = iframe.contentDocument;
-        iframeDoc.body.style.cursor = 'crosshair';
-        iframeDoc.body.addEventListener('click', handlePreviewClick);
-        iframeDoc.body.addEventListener('mouseover', handlePreviewMouseOver);
-    });
-}
-```
-
-#### ホバーハイライト
-```javascript
-function handlePreviewMouseOver(e) {
-    if (!isPreviewSelectMode) return;
-    e.target.style.outline = '2px solid #667eea';
-}
-```
-
-### 変更ファイル
-- `lpbuilder.html`: 編集パネルHTML追加
-- `lpbuilder.css`: 編集パネルスタイル
-- `lpbuilder.js`: 選択モード関連関数群
-
----
-
-## 6. 画像生成機能
-
-### 仕様
-- 「画像生成」ボタンクリック → プロンプト入力ダイアログ
-- API呼び出し → 生成画像をHTMLエディタに挿入
-
-### 技術実装
-```javascript
-async function generatePreviewImage(prompt) {
-    const response = await fetch(`${API_BASE_URL}/image/generate`, {
-        method: 'POST',
-        body: JSON.stringify({ prompt, size: '1024x1024' })
-    });
+function loadProjectToEditors(project) {
+    const htmlContent = project.files?.html || '';
+    // ... setValue ...
     
-    if (response.ok && data.image) {
-        const imgTag = `<img src="data:image/png;base64,${data.image}" ...>`;
-        htmlEditor.replaceSelection(imgTag);
+    // previousValuesを初期化（ダーティ誤判定防止）
+    previousValues.html = htmlContent;
+    previousValues.css = cssContent;
+    previousValues.js = jsContent;
+}
+```
+
+**変更ファイル**: `lpbuilder.js:293-330`
+
+---
+
+### 3. 最終タブ閉鎖時の整合性（高）
+
+**問題**: `TabManager.closeTab` で新規タブ自動作成時に `projectId` が未設定
+
+**解決**:
+```javascript
+async function loadActiveTabProject() {
+    // projectIdがない場合は新規プロジェクト作成
+    if (!activeTab.projectId) {
+        const newProject = createDefaultProject();
+        await saveProject(newProject);
+        activeTab.projectId = newProject.id;
+        state.currentProject = newProject;
+        loadProjectToEditors(newProject);
+        saveTabState();
+        return;
+    }
+    // ...
+}
+```
+
+**変更ファイル**: `lpbuilder.js:278-300`
+
+---
+
+### 4. .js-project-name参照エラー（高）
+
+**問題**: `openProject` が存在しない `.js-project-name` を参照
+
+**解決**:
+```javascript
+// Before
+document.querySelector('.js-project-name').value = project.name;
+
+// After
+const activeTabId = state.tabManager.getActiveTabId();
+state.tabManager.renameTab(activeTabId, project.name);
+renderProjectTabs();
+```
+
+**変更ファイル**: `lpbuilder.js:1796-1800`
+
+---
+
+### 5. ZIP出力パス整合（中）
+
+**問題**: デフォルトHTML内のパスが `style.css`, `script.js` だがZIP出力は `css/`, `js/` フォルダ
+
+**解決**:
+```html
+<!-- Before -->
+<link rel="stylesheet" href="style.css">
+<script src="script.js"></script>
+
+<!-- After -->
+<link rel="stylesheet" href="css/style.css">
+<script src="js/script.js"></script>
+```
+
+**変更ファイル**: `lpbuilder.js:607, 637`
+
+---
+
+### 6. サーバーAPIエンドポイント追加（中）
+
+**追加エンドポイント**:
+
+| メソッド | パス | 用途 |
+|---|---|---|
+| POST | `/api/lp/modify-element` | プレビュー要素修正 |
+| POST | `/api/lp/modify-selection` | コード選択修正 |
+| POST | `/api/image/generate` | 画像生成 |
+
+**変更ファイル**: `server/src/app.js:183-350`
+
+---
+
+### 7. 画像タグinline style削除（中）
+
+**問題**: 生成画像タグにinline styleがあり規約違反
+
+**解決**:
+```javascript
+// Before
+`<img ... style="max-width: 100%; height: auto;">`
+
+// After  
+`<img ... class="lp-generated-image">`
+```
+
+**CSSクラス追加**:
+```css
+.lp-generated-image {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 20px auto;
+}
+```
+
+**変更ファイル**: `lpbuilder.js:995, 1216, 1659-1667`
+
+---
+
+### 8. 選択モードイベント再登録
+
+**問題**: `srcdoc` 更新後にiframe内イベントが消える
+
+**解決**:
+```javascript
+function updatePreview() {
+    const reEnableSelection = () => {
+        if (isPreviewSelectMode) {
+            setTimeout(enablePreviewSelection, 100);
+        }
+    };
+    
+    if (mobileIframe) {
+        mobileIframe.onload = reEnableSelection;
+        mobileIframe.srcdoc = previewHtml;
     }
 }
 ```
 
----
-
-## 未実装・要対応事項
-
-### サーバーサイドAPI
-
-以下のAPIエンドポイントがフロントエンドから呼び出されますが、サーバー側の実装が必要です：
-
-| エンドポイント | 用途 | ステータス |
-|---|---|---|
-| `POST /lp/modify-element` | 要素選択修正 | ⚠️ 未実装 |
-| `POST /lp/modify-selection` | コード選択修正 | ⚠️ 未実装 |
-| `POST /image/generate` | 画像生成 | 要確認 |
-
-### APIリクエスト仕様
-
-#### `/lp/modify-element`
-```json
-// Request
-{
-    "elementHtml": "<h1>見出しテキスト</h1>",
-    "instruction": "色を青に変更",
-    "fullHtml": "<!DOCTYPE html>..."
-}
-
-// Response
-{
-    "modifiedHtml": "<!DOCTYPE html>... (修正後の全体HTML)"
-}
-```
+**変更ファイル**: `lpbuilder.js:1494-1513`
 
 ---
 
 ## テスト結果
 
-### 動作確認済み
-- [x] タブ名ダブルクリック編集
-- [x] PC/スマホプレビュー切替
-- [x] エディタ開閉
-- [x] プレビューツールバー表示
-- [x] 選択モードON/OFF
-- [x] 要素ホバーハイライト
+```
+📦 TabManager
+  ✅ 新規タブを作成すると、タブが1個追加される
+  ✅ 新規タブを作成すると、そのタブがアクティブになる
+  ✅ 最大5タブまで作成可能、6つ目はnullを返す
+  ✅ タブを閉じるとタブ数が減る
+  ✅ 最後のタブを閉じると新規タブが自動作成される
+  ✅ タブを切り替えるとアクティブタブが変わる
+  ✅ タブ状態をシリアライズ・デシリアライズできる
+  ✅ projectIdでタブを検索できる
+  ✅ タブ名を変更できる
 
-### 未テスト（API未実装のため）
-- [ ] 要素修正の実際の適用
-- [ ] 画像生成・挿入
+✨ テスト完了 (全9ケース PASSED)
+```
 
 ---
 
 ## コミット履歴
 
 ```
+2fc7c38 feat: LP Builder 全指摘対応完了
+e06a6be fix: プレビュー選択モードをiframe load後に再有効化
+4eaed27 fix: LP Builder レビュー指摘対応
 aac4b9d feat: LP Builder プレビュー内ツールバー実装
-ab95abe fix: LP Builder UI改善（エディタ完全開閉・選択モードボタン）
-f083728 fix: タブ名ダブルクリックで編集可能に変更
-9ad5719 feat: LP Builder UI改善（タブ名・プレビュー切替・履歴削除）
-bc49274 feat: LP Builder 追加機能
-51ac32a feat: LP Builder タブ名編集・プロジェクト履歴機能
+ab95abe fix: LP Builder UI改善
 ```
 
 ---
 
-## レビューポイント
+## 動作確認手順
 
-1. **iframe内イベント処理**: セキュリティ（same-origin）とイベント伝播の妥当性
-2. **状態管理**: 選択モードのグローバル変数 `isPreviewSelectMode` の設計
-3. **API設計**: `/lp/modify-element` のリクエスト/レスポンス仕様
-4. **UX**: 選択モードの操作フローが直感的か
+### 1. 選択修正モード
+1. LP Builderを開く
+2. プレビュー下部「選択修正」ボタンをクリック
+3. プレビュー内の要素にマウスオーバー → 青枠ハイライト
+4. クリックで選択 → 編集パネル表示
+5. 修正指示入力 → 「修正を適用」
 
----
+### 2. タブ操作
+1. 「＋」ボタンで新規タブ作成
+2. タブ名ダブルクリックで編集
+3. ×ボタンでタブ閉じる（最後の1つでも新規自動作成）
 
-## スクリーンショット
+### 3. PC/スマホプレビュー
+1. プレビューヘッダーのPC/スマホアイコンで切替
 
-### 選択モード有効時
-プレビューツールバーの「選択修正」ボタンが青色でアクティブ状態。
-トースト通知で操作ガイドを表示。
-
-### PCプレビューモード  
-デスクトップアイコンをクリックするとフル幅でプレビュー表示。
-スマホフレームなしでコンテンツを確認可能。
+### 4. ZIP出力
+1. 「ZIP出力」ボタンをクリック
+2. ダウンロードされたZIPを解凍
+3. `css/style.css`, `js/script.js` が正しく参照されていることを確認
