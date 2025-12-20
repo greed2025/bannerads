@@ -1345,9 +1345,9 @@ function initEventListeners() {
         togglePreviewSelectMode();
     });
     
-    // プレビュー画像生成ボタン
-    document.querySelector('.js-preview-image-btn')?.addEventListener('click', () => {
-        openImageGenerationModal();
+    // 画像生成キャンセルボタン
+    document.querySelector('.js-image-gen-cancel')?.addEventListener('click', () => {
+        hideImageGenerationOptions();
     });
     
     // プレビュー編集パネル閉じる
@@ -1994,6 +1994,25 @@ async function sendChatMessage() {
     const message = input?.value?.trim();
     if (!message) return;
     
+    // /image コマンド検知
+    if (message.startsWith('/image ') || message.startsWith('/画像 ')) {
+        const prompt = message.replace(/^\/(image|画像)\s+/, '');
+        if (prompt) {
+            showImageGenerationOptions();
+            input.value = prompt; // プロンプトのみ残す
+            showToast('画像の挿入位置を選択してください', 'info');
+        }
+        return;
+    }
+    
+    // 画像生成オプションが表示されている場合は画像生成
+    const imageGenOptions = document.querySelector('.js-image-gen-options');
+    if (imageGenOptions && imageGenOptions.style.display !== 'none') {
+        await generateImageFromChat(message);
+        return;
+    }
+    
+    // 通常のチャット処理
     // ユーザーメッセージを追加
     addChatMessage('user', message);
     input.value = '';
@@ -3169,5 +3188,138 @@ function deleteImage(imageId) {
     updatePreview();
     saveCurrentState();
     showToast('画像を削除しました', 'info');
+}
+
+// ========================================
+// チャット画像生成機能
+// ========================================
+
+function showImageGenerationOptions() {
+    const options = document.querySelector('.js-image-gen-options');
+    if (options) {
+        options.style.display = 'flex';
+    }
+}
+
+function hideImageGenerationOptions() {
+    const options = document.querySelector('.js-image-gen-options');
+    const input = document.querySelector('.js-chat-input');
+    if (options) {
+        options.style.display = 'none';
+    }
+    if (input) {
+        input.value = '';
+    }
+}
+
+async function generateImageFromChat(prompt) {
+    if (!prompt) return;
+    
+    const input = document.querySelector('.js-chat-input');
+    const insertPosition = document.querySelector('.js-image-insert-position')?.value || 'cursor';
+    
+    // UI更新
+    addChatMessage('user', `/image ${prompt}`);
+    hideImageGenerationOptions();
+    
+    try {
+        showToast('画像を生成中...', 'info');
+        
+        const response = await fetch(`${API_BASE_URL}/image/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.imageData) {
+            // 生成画像をチャットに表示
+            const imageHtml = `<img src="${data.imageData}" alt="生成画像" style="max-width: 100%; border-radius: 8px; margin-top: 8px;">`;
+            addChatMessage('assistant', `画像を生成しました:\n${imageHtml}`);
+            
+            // 画像をプロジェクトに追加
+            if (!state.currentProject.images) {
+                state.currentProject.images = [];
+            }
+            const imageId = generateId();
+            const imageName = `generated_${Date.now()}.png`;
+            state.currentProject.images.push({
+                id: imageId,
+                name: imageName,
+                dataUrl: data.imageData,
+                type: 'image/png',
+                size: data.imageData.length
+            });
+            
+            // HTMLに挿入
+            insertImageToHTML(imageName, insertPosition);
+            
+            // プレビュー更新
+            renderImagesGrid();
+            updatePreview();
+            saveCurrentState();
+            
+            showToast('画像を生成してHTMLに挿入しました', 'success');
+        } else {
+            addChatMessage('assistant', `エラー: ${data.error || '画像生成に失敗しました'}`);
+            showToast('画像生成に失敗しました', 'error');
+        }
+    } catch (error) {
+        console.error('Image generation error:', error);
+        addChatMessage('assistant', 'ネットワークエラーが発生しました。');
+        showToast('エラーが発生しました', 'error');
+    }
+}
+
+function insertImageToHTML(imageName, position) {
+    const htmlEditor = state.editors.html;
+    if (!htmlEditor) return;
+    
+    const imgTag = `<img src="img/${imageName}" alt="生成画像" class="lp-generated-image">`;
+    
+    switch (position) {
+        case 'cursor':
+            // カーソル位置に挿入
+            htmlEditor.replaceSelection(imgTag);
+            break;
+            
+        case 'hero':
+            // ヒーローセクションを探して挿入
+            const htmlContent = htmlEditor.getValue();
+            const heroMatch = htmlContent.match(/(<section[^>]*class="?[^"]*hero[^"]*"?[^>]*>)/i);
+            if (heroMatch) {
+                const insertPos = heroMatch.index + heroMatch[0].length;
+                const newContent = htmlContent.substring(0, insertPos) + '\n            ' + imgTag + '\n' + htmlContent.substring(insertPos);
+                htmlEditor.setValue(newContent);
+            } else {
+                // ヒーローセクションが見つからない場合はbody内の先頭に挿入
+                const bodyMatch = htmlContent.match(/(<body[^>]*>)/i);
+                if (bodyMatch) {
+                    const insertPos = bodyMatch.index + bodyMatch[0].length;
+                    const newContent = htmlContent.substring(0, insertPos) + '\n    ' + imgTag + '\n' + htmlContent.substring(insertPos);
+                    htmlEditor.setValue(newContent);
+                } else {
+                    htmlEditor.replaceSelection(imgTag);
+                }
+            }
+            break;
+            
+        case 'end':
+            // HTML末尾（</body>の前）に挿入
+            const currentHtml = htmlEditor.getValue();
+            const bodyEndMatch = currentHtml.match(/(<\/body>)/i);
+            if (bodyEndMatch) {
+                const insertPos = bodyEndMatch.index;
+                const newContent = currentHtml.substring(0, insertPos) + '    ' + imgTag + '\n' + currentHtml.substring(insertPos);
+                htmlEditor.setValue(newContent);
+            } else {
+                // bodyタグがない場合は末尾に追加
+                htmlEditor.setValue(currentHtml + '\n' + imgTag);
+            }
+            break;
+    }
+    
+    htmlEditor.focus();
 }
 
