@@ -754,6 +754,7 @@ function initEditors() {
             indentWithTabs: false
         });
         state.editors.html.on('change', () => handleEditorChange('html'));
+        state.editors.html.on('cursorActivity', () => handleEditorSelection('html'));
     }
     
     // CSSエディタ
@@ -768,6 +769,7 @@ function initEditors() {
             indentWithTabs: false
         });
         state.editors.css.on('change', () => handleEditorChange('css'));
+        state.editors.css.on('cursorActivity', () => handleEditorSelection('css'));
     }
     
     // JSエディタ
@@ -782,6 +784,7 @@ function initEditors() {
             indentWithTabs: false
         });
         state.editors.js.on('change', () => handleEditorChange('js'));
+        state.editors.js.on('cursorActivity', () => handleEditorSelection('js'));
     }
 }
 
@@ -814,6 +817,165 @@ function handleEditorChange(type) {
     state.saveTimeout = setTimeout(() => {
         saveCurrentState();
     }, 500);
+}
+
+// 選択状態
+let currentSelection = {
+    editorType: null,
+    text: '',
+    from: null,
+    to: null
+};
+
+// 選択ハンドラ（デバウンス用）
+let selectionTimeout = null;
+
+function handleEditorSelection(type) {
+    if (selectionTimeout) {
+        clearTimeout(selectionTimeout);
+    }
+    
+    selectionTimeout = setTimeout(() => {
+        const editor = state.editors[type];
+        if (!editor) return;
+        
+        const selection = editor.getSelection();
+        if (selection && selection.length > 5) {
+            // 選択があれば表示
+            currentSelection = {
+                editorType: type,
+                text: selection,
+                from: editor.getCursor('from'),
+                to: editor.getCursor('to')
+            };
+            showSelectionPanel(selection);
+        } else {
+            // 選択がなければ非表示（少し遅延）
+            setTimeout(() => {
+                const currentEditor = state.editors[currentSelection.editorType];
+                if (currentEditor && !currentEditor.getSelection()) {
+                    hideSelectionPanel();
+                }
+            }, 200);
+        }
+    }, 300);
+}
+
+function showSelectionPanel(text) {
+    const panel = document.querySelector('.js-selection-panel');
+    const preview = document.querySelector('.js-selection-preview');
+    const input = document.querySelector('.js-selection-input');
+    
+    if (!panel || !preview) return;
+    
+    // プレビューに選択テキストを表示（最大200文字）
+    const displayText = text.length > 200 ? text.substring(0, 200) + '...' : text;
+    preview.textContent = displayText;
+    
+    // 入力欄をクリア
+    if (input) input.value = '';
+    
+    panel.style.display = 'block';
+}
+
+function hideSelectionPanel() {
+    const panel = document.querySelector('.js-selection-panel');
+    if (panel) {
+        panel.style.display = 'none';
+    }
+}
+
+async function applySelectionModification() {
+    const input = document.querySelector('.js-selection-input');
+    const instruction = input?.value?.trim();
+    
+    if (!instruction || !currentSelection.text) {
+        showToast('修正指示を入力してください', 'warning');
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/lp/modify-selection`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                selectedCode: currentSelection.text,
+                instruction: instruction,
+                codeType: currentSelection.editorType
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.modifiedCode) {
+            // 選択テキストを置換
+            const editor = state.editors[currentSelection.editorType];
+            if (editor) {
+                editor.replaceRange(
+                    data.modifiedCode,
+                    currentSelection.from,
+                    currentSelection.to
+                );
+            }
+            
+            hideSelectionPanel();
+            showToast('コードを修正しました', 'success');
+        } else {
+            showToast(data.error || '修正に失敗しました', 'error');
+        }
+    } catch (error) {
+        console.error('Selection modification error:', error);
+        showToast('通信エラーが発生しました', 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function generateImageForSelection() {
+    const input = document.querySelector('.js-selection-input');
+    const instruction = input?.value?.trim();
+    
+    if (!instruction) {
+        showToast('画像の説明を入力してください', 'warning');
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/image/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: instruction,
+                size: '1024x1024'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.image) {
+            // 画像タグを生成してエディタに挿入
+            const imgTag = `<img src="data:image/png;base64,${data.image}" alt="${escapeHtml(instruction)}" style="max-width: 100%; height: auto;">`;
+            
+            const htmlEditor = state.editors.html;
+            if (htmlEditor) {
+                htmlEditor.replaceSelection(imgTag);
+            }
+            
+            hideSelectionPanel();
+            showToast('画像を生成・挿入しました', 'success');
+        } else {
+            showToast(data.error || '画像生成に失敗しました', 'error');
+        }
+    } catch (error) {
+        console.error('Image generation error:', error);
+        showToast('通信エラーが発生しました', 'error');
+    } finally {
+        hideLoading();
+    }
 }
 
 // ========================================
@@ -858,6 +1020,34 @@ function initEventListeners() {
     // フルスクリーン
     document.querySelector('.js-fullscreen-btn')?.addEventListener('click', () => {
         toggleFullscreen();
+    });
+    
+    // エディタエリア開閉
+    document.querySelector('.js-editors-toggle')?.addEventListener('click', () => {
+        const editorsArea = document.querySelector('.js-editors-area');
+        editorsArea?.classList.toggle('collapsed');
+        
+        // エディタをリフレッシュ
+        setTimeout(() => {
+            state.editors.html?.refresh();
+            state.editors.css?.refresh();
+            state.editors.js?.refresh();
+        }, 300);
+    });
+    
+    // 部分選択パネル閉じる
+    document.querySelector('.js-selection-panel-close')?.addEventListener('click', () => {
+        hideSelectionPanel();
+    });
+    
+    // 部分選択修正ボタン
+    document.querySelector('.js-selection-modify')?.addEventListener('click', () => {
+        applySelectionModification();
+    });
+    
+    // 部分選択画像生成ボタン
+    document.querySelector('.js-selection-image')?.addEventListener('click', () => {
+        generateImageForSelection();
     });
     
     // 右パネル開閉

@@ -77,7 +77,13 @@
         <!-- メインコンテンツ -->
         <div class="lpbuilder-main">
             <!-- 左側: エディタエリア（3分割） -->
-            <div class="editors-area">
+            <div class="editors-area js-editors-area">
+                <button class="editors-toggle-btn js-editors-toggle" title="コードエディタ開閉">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                </button>
+                
                 <!-- HTMLエディタ -->
                 <div class="editor-section">
                     <div class="editor-section-header">
@@ -106,6 +112,38 @@
                     <div class="editor-wrapper">
                         <textarea class="editor-textarea js-editor-js"></textarea>
                     </div>
+                </div>
+            </div>
+            
+            <!-- 部分選択修正パネル（フローティング） -->
+            <div class="selection-panel js-selection-panel" style="display: none;">
+                <div class="selection-panel-header">
+                    <span>選択コードを修正</span>
+                    <button class="selection-panel-close js-selection-panel-close">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="selection-preview js-selection-preview"></div>
+                <textarea class="selection-input js-selection-input" placeholder="修正指示を入力...（例：色を青に変更）" rows="2"></textarea>
+                <div class="selection-panel-actions">
+                    <button class="selection-action-btn js-selection-modify">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        修正
+                    </button>
+                    <button class="selection-action-btn js-selection-image">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                        画像生成
+                    </button>
                 </div>
             </div>
             
