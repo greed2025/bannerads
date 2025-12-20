@@ -1001,6 +1001,228 @@ async function generateImageForSelection() {
 }
 
 // ========================================
+// プレビュー選択モード
+// ========================================
+
+let isPreviewSelectMode = false;
+let selectedPreviewElement = null;
+
+function togglePreviewSelectMode() {
+    isPreviewSelectMode = !isPreviewSelectMode;
+    
+    const btn = document.querySelector('.js-preview-select-btn');
+    if (btn) {
+        btn.classList.toggle('active', isPreviewSelectMode);
+    }
+    
+    if (isPreviewSelectMode) {
+        showToast('選択モード: プレビュー内の要素をクリックしてください', 'info');
+        enablePreviewSelection();
+    } else {
+        hidePreviewEditPanel();
+        disablePreviewSelection();
+    }
+}
+
+function enablePreviewSelection() {
+    // 両方のiframeにイベントを追加
+    const mobileIframe = document.querySelector('.js-preview-iframe');
+    const desktopIframe = document.querySelector('.js-preview-iframe-desktop');
+    
+    [mobileIframe, desktopIframe].forEach(iframe => {
+        if (!iframe) return;
+        
+        try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            
+            // クリックイベントを追加
+            iframeDoc.body.style.cursor = 'crosshair';
+            iframeDoc.body.addEventListener('click', handlePreviewClick);
+            
+            // ホバー効果
+            iframeDoc.body.addEventListener('mouseover', handlePreviewMouseOver);
+            iframeDoc.body.addEventListener('mouseout', handlePreviewMouseOut);
+        } catch (e) {
+            console.error('Cannot access iframe:', e);
+        }
+    });
+}
+
+function disablePreviewSelection() {
+    const mobileIframe = document.querySelector('.js-preview-iframe');
+    const desktopIframe = document.querySelector('.js-preview-iframe-desktop');
+    
+    [mobileIframe, desktopIframe].forEach(iframe => {
+        if (!iframe) return;
+        
+        try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            iframeDoc.body.style.cursor = 'default';
+            iframeDoc.body.removeEventListener('click', handlePreviewClick);
+            iframeDoc.body.removeEventListener('mouseover', handlePreviewMouseOver);
+            iframeDoc.body.removeEventListener('mouseout', handlePreviewMouseOut);
+            
+            // ハイライト解除
+            iframeDoc.querySelectorAll('[data-lpbuilder-highlight]').forEach(el => {
+                el.style.outline = '';
+                el.removeAttribute('data-lpbuilder-highlight');
+            });
+        } catch (e) {
+            console.error('Cannot access iframe:', e);
+        }
+    });
+}
+
+function handlePreviewClick(e) {
+    if (!isPreviewSelectMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    selectedPreviewElement = e.target;
+    
+    // テキスト内容または外側HTMLを取得
+    const content = selectedPreviewElement.innerText || selectedPreviewElement.outerHTML.substring(0, 200);
+    
+    showPreviewEditPanel(content);
+}
+
+function handlePreviewMouseOver(e) {
+    if (!isPreviewSelectMode) return;
+    e.target.setAttribute('data-lpbuilder-highlight', 'true');
+    e.target.style.outline = '2px solid #667eea';
+}
+
+function handlePreviewMouseOut(e) {
+    if (!isPreviewSelectMode) return;
+    e.target.style.outline = '';
+    e.target.removeAttribute('data-lpbuilder-highlight');
+}
+
+function showPreviewEditPanel(selectedText) {
+    const panel = document.querySelector('.js-preview-edit-panel');
+    const selectedEl = document.querySelector('.js-preview-edit-selected');
+    const input = document.querySelector('.js-preview-edit-input');
+    
+    if (!panel) return;
+    
+    if (selectedEl) {
+        selectedEl.textContent = selectedText.substring(0, 100) + (selectedText.length > 100 ? '...' : '');
+    }
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    
+    panel.style.display = 'block';
+}
+
+function hidePreviewEditPanel() {
+    const panel = document.querySelector('.js-preview-edit-panel');
+    if (panel) {
+        panel.style.display = 'none';
+    }
+    selectedPreviewElement = null;
+}
+
+async function applyPreviewEdit() {
+    const input = document.querySelector('.js-preview-edit-input');
+    const instruction = input?.value?.trim();
+    
+    if (!instruction) {
+        showToast('修正指示を入力してください', 'warning');
+        return;
+    }
+    
+    if (!selectedPreviewElement) {
+        showToast('要素が選択されていません', 'warning');
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const elementHtml = selectedPreviewElement.outerHTML;
+        
+        const response = await fetch(`${API_BASE_URL}/lp/modify-element`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                elementHtml: elementHtml,
+                instruction: instruction,
+                fullHtml: state.currentProject?.files?.html || ''
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.modifiedHtml) {
+            // HTMLを更新
+            if (state.editors.html) {
+                state.editors.html.setValue(data.modifiedHtml);
+            }
+            
+            hidePreviewEditPanel();
+            togglePreviewSelectMode(); // モード解除
+            updatePreview();
+            showToast('要素を修正しました', 'success');
+        } else {
+            showToast(data.error || '修正に失敗しました', 'error');
+        }
+    } catch (error) {
+        console.error('Preview edit error:', error);
+        showToast('通信エラーが発生しました', 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function openImageGenerationModal() {
+    // 画像生成モーダルを開く（簡易実装：プロンプト入力）
+    const prompt = window.prompt('生成したい画像の説明を入力してください:');
+    if (!prompt) return;
+    
+    generatePreviewImage(prompt);
+}
+
+async function generatePreviewImage(prompt) {
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/image/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: prompt,
+                size: '1024x1024'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.image) {
+            // 画像タグを生成してHTMLに挿入
+            const imgTag = `<img src="data:image/png;base64,${data.image}" alt="${escapeHtml(prompt)}" style="max-width: 100%; height: auto;">`;
+            
+            const htmlEditor = state.editors.html;
+            if (htmlEditor) {
+                // カーソル位置に挿入
+                htmlEditor.replaceSelection(imgTag);
+            }
+            
+            updatePreview();
+            showToast('画像を生成・挿入しました', 'success');
+        } else {
+            showToast(data.error || '画像生成に失敗しました', 'error');
+        }
+    } catch (error) {
+        console.error('Image generation error:', error);
+        showToast('通信エラーが発生しました', 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// ========================================
 // イベントリスナー
 // ========================================
 
@@ -1080,6 +1302,26 @@ function initEventListeners() {
     // 右パネル開閉
     document.querySelector('.js-right-panel-toggle')?.addEventListener('click', () => {
         document.querySelector('.js-right-panel')?.classList.toggle('collapsed');
+    });
+    
+    // プレビュー選択修正モード
+    document.querySelector('.js-preview-select-btn')?.addEventListener('click', () => {
+        togglePreviewSelectMode();
+    });
+    
+    // プレビュー画像生成ボタン
+    document.querySelector('.js-preview-image-btn')?.addEventListener('click', () => {
+        openImageGenerationModal();
+    });
+    
+    // プレビュー編集パネル閉じる
+    document.querySelector('.js-preview-edit-close')?.addEventListener('click', () => {
+        hidePreviewEditPanel();
+    });
+    
+    // プレビュー修正適用
+    document.querySelector('.js-preview-edit-apply')?.addEventListener('click', () => {
+        applyPreviewEdit();
     });
     
     // チャット送信

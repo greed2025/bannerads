@@ -580,6 +580,125 @@ button {
     display: none !important;
 }
 
+/* プレビューツールバー */
+.preview-toolbar {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    background: var(--color-white);
+    border-top: 1px solid var(--border-color);
+}
+
+.preview-tool-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: var(--color-gray-100);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-gray-700);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.preview-tool-btn:hover {
+    background: var(--color-gray-200);
+}
+
+.preview-tool-btn.active {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+/* 選択修正パネル（プレビュー内） */
+.preview-edit-panel {
+    background: var(--color-white);
+    border-top: 1px solid var(--border-color);
+    padding: 12px 16px;
+}
+
+.preview-edit-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.preview-edit-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-gray-700);
+}
+
+.preview-edit-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-gray-400);
+    padding: 4px;
+}
+
+.preview-edit-close:hover {
+    color: var(--color-gray-700);
+}
+
+.preview-edit-selected {
+    padding: 8px 12px;
+    background: var(--color-gray-50);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: var(--color-gray-600);
+    margin-bottom: 10px;
+    max-height: 60px;
+    overflow-y: auto;
+}
+
+.preview-edit-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    resize: none;
+    margin-bottom: 10px;
+    outline: none;
+}
+
+.preview-edit-input:focus {
+    border-color: var(--color-primary);
+}
+
+.preview-edit-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.preview-edit-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.preview-edit-btn.primary {
+    background: var(--color-primary);
+    color: white;
+}
+
+.preview-edit-btn.primary:hover {
+    background: var(--color-primary-hover);
+}
+
 /* タブヘッダー */
 .tab-header {
     display: flex;
