@@ -1492,11 +1492,21 @@ function updatePreview() {
     // プレビュー用HTMLを組み立て（CSS/JSをインライン化）
     const previewHtml = buildPreviewHtml();
     
+    // 選択モードの再有効化関数
+    const reEnableSelection = () => {
+        if (isPreviewSelectMode) {
+            // 少し遅延してからイベント登録
+            setTimeout(enablePreviewSelection, 100);
+        }
+    };
+    
     // 両方のiframeを更新
     if (mobileIframe) {
+        mobileIframe.onload = reEnableSelection;
         mobileIframe.srcdoc = previewHtml;
     }
     if (desktopIframe) {
+        desktopIframe.onload = reEnableSelection;
         desktopIframe.srcdoc = previewHtml;
     }
 }
