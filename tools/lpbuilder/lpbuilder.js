@@ -1545,9 +1545,10 @@ function buildPreviewHtml() {
     const project = state.currentProject;
     if (!project) return '';
     
-    let html = project.files?.html || getDefaultHtml();
-    const css = project.files?.css || '';
-    const js = project.files?.js || '';
+    // エディタから直接最新の値を取得（保存前でも反映）
+    let html = state.editors.html?.getValue() || project.files?.html || getDefaultHtml();
+    const css = state.editors.css?.getValue() || project.files?.css || '';
+    const js = state.editors.js?.getValue() || project.files?.js || '';
     
     // 画像をBase64データURLに変換
     if (project.images) {
