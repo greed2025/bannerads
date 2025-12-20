@@ -291,15 +291,27 @@ async function loadActiveTabProject() {
  * プロジェクトをエディタに読み込み
  */
 function loadProjectToEditors(project) {
+    // 一時的に変更検知を無効化
+    const isLoading = true;
+    
+    const htmlContent = project.files?.html || '';
+    const cssContent = project.files?.css || '';
+    const jsContent = project.files?.js || '';
+    
     if (state.editors.html) {
-        state.editors.html.setValue(project.files?.html || '');
+        state.editors.html.setValue(htmlContent);
     }
     if (state.editors.css) {
-        state.editors.css.setValue(project.files?.css || '');
+        state.editors.css.setValue(cssContent);
     }
     if (state.editors.js) {
-        state.editors.js.setValue(project.files?.js || '');
+        state.editors.js.setValue(jsContent);
     }
+    
+    // previousValuesを初期化（ダーティ誤判定防止）
+    previousValues.html = htmlContent;
+    previousValues.css = cssContent;
+    previousValues.js = jsContent;
     
     // エディタをリフレッシュ（新しいレイアウトで表示を更新）
     setTimeout(() => {
@@ -980,7 +992,7 @@ async function generateImageForSelection() {
         
         if (response.ok && data.image) {
             // 画像タグを生成してエディタに挿入
-            const imgTag = `<img src="data:image/png;base64,${data.image}" alt="${escapeHtml(instruction)}" style="max-width: 100%; height: auto;">`;
+            const imgTag = `<img src="data:image/png;base64,${data.image}" alt="${escapeHtml(instruction)}" class="lp-generated-image">`;
             
             const htmlEditor = state.editors.html;
             if (htmlEditor) {
@@ -1201,7 +1213,7 @@ async function generatePreviewImage(prompt) {
         
         if (response.ok && data.image) {
             // 画像タグを生成してHTMLに挿入
-            const imgTag = `<img src="data:image/png;base64,${data.image}" alt="${escapeHtml(prompt)}" style="max-width: 100%; height: auto;">`;
+            const imgTag = `<img src="data:image/png;base64,${data.image}" alt="${escapeHtml(prompt)}" class="lp-generated-image">`;
             
             const htmlEditor = state.editors.html;
             if (htmlEditor) {
@@ -1638,6 +1650,14 @@ body {
 
 .footer a:hover {
     text-decoration: underline;
+}
+
+/* 生成画像 */
+.lp-generated-image {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 20px auto;
 }`;
 }
 
@@ -1781,8 +1801,10 @@ async function openProject(id) {
         state.undoHistory = project.history || { html: [], css: [], js: [] };
         state.redoHistory = { html: [], css: [], js: [] };
         
-        // UIに反映
-        document.querySelector('.js-project-name').value = project.name;
+        // UIに反映（タブ名更新）
+        const activeTabId = state.tabManager.getActiveTabId();
+        state.tabManager.renameTab(activeTabId, project.name);
+        renderProjectTabs();
         
         // エディタに反映
         if (state.editors.html) state.editors.html.setValue(project.files.html || '');
