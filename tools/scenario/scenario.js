@@ -147,44 +147,160 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ========================================
-    // LocalStorage 保存・読み込み
+    // IndexedDB 保存・読み込み
     // ========================================
-    function saveToLocalStorage() {
-        try {
-            const data = {
-                projects: projects,
-                deletedProjects: deletedProjects,
-                currentProjectId: currentProjectId,
-                projectCounter: projectCounter
+    const DB_NAME = 'ScenarioToolDB';
+    const DB_VERSION = 1;
+    const STORE_PROJECTS = 'projects';
+    const STORE_DELETED = 'deleted_projects';
+    let db = null;
+
+    async function initIndexedDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                db = request.result;
+                resolve(db);
             };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                
+                // プロジェクトストア
+                if (!db.objectStoreNames.contains(STORE_PROJECTS)) {
+                    const projectStore = db.createObjectStore(STORE_PROJECTS, { keyPath: 'id' });
+                    projectStore.createIndex('name', 'name', { unique: false });
+                }
+                
+                // 削除済みプロジェクトストア
+                if (!db.objectStoreNames.contains(STORE_DELETED)) {
+                    const deletedStore = db.createObjectStore(STORE_DELETED, { keyPath: 'id' });
+                    deletedStore.createIndex('deletedAt', 'deletedAt', { unique: false });
+                }
+            };
+        });
+    }
+
+    async function migrateFromLocalStorage() {
+        const oldData = localStorage.getItem(STORAGE_KEY);
+        if (!oldData) return false;
+        
+        try {
+            const data = JSON.parse(oldData);
+            const migratedProjects = data.projects || [];
+            const migratedDeleted = data.deletedProjects || [];
+            
+            // IndexedDBに移行
+            const transaction = db.transaction([STORE_PROJECTS, STORE_DELETED], 'readwrite');
+            const projectStore = transaction.objectStore(STORE_PROJECTS);
+            const deletedStore = transaction.objectStore(STORE_DELETED);
+            
+            for (const project of migratedProjects) {
+                await projectStore.put(project);
+            }
+            
+            for (const deleted of migratedDeleted) {
+                await deletedStore.put(deleted);
+            }
+            
+            // 移行後、LocalStorageの旧データをバックアップしてクリア
+            localStorage.setItem(STORAGE_KEY + '_backup', oldData);
+            localStorage.removeItem(STORAGE_KEY);
+            
+            console.log('✅ LocalStorage → IndexedDB 移行完了');
+            return true;
         } catch (error) {
-            console.error('LocalStorage保存エラー:', error);
+            console.error('❌ マイグレーションエラー:', error);
+            return false;
+        }
+    }
+
+    async function saveToIndexedDB() {
+        if (!db) {
+            console.error('IndexedDB not initialized');
+            return;
+        }
+        
+        try {
+            const transaction = db.transaction([STORE_PROJECTS, STORE_DELETED], 'readwrite');
+            const projectStore = transaction.objectStore(STORE_PROJECTS);
+            const deletedStore = transaction.objectStore(STORE_DELETED);
+            
+            // 既存データをクリア
+            await projectStore.clear();
+            await deletedStore.clear();
+            
+            // 新しいデータを保存
+            for (const project of projects) {
+                await projectStore.put(project);
+            }
+            
+            for (const deleted of deletedProjects) {
+                await deletedStore.put(deleted);
+            }
+            
+            // currentProjectIdとprojectCounterはLocalStorageに保存（軽量データ）
+            localStorage.setItem('scenario_state_v1', JSON.stringify({
+                currentProjectId,
+                projectCounter
+            }));
+            
+        } catch (error) {
+            console.error('IndexedDB保存エラー:', error);
         }
     }
     
-    function loadFromLocalStorage() {
-        try {
-            const savedData = localStorage.getItem(STORAGE_KEY);
-            if (savedData) {
-                const data = JSON.parse(savedData);
-                projects = data.projects || [];
-                deletedProjects = data.deletedProjects || [];
-                currentProjectId = data.currentProjectId;
-                projectCounter = data.projectCounter || 0;
-                return true;
-            }
-        } catch (error) {
-            console.error('LocalStorage読み込みエラー:', error);
+    async function loadFromIndexedDB() {
+        if (!db) {
+            console.error('IndexedDB not initialized');
+            return false;
         }
-        return false;
+        
+        try {
+            const transaction = db.transaction([STORE_PROJECTS, STORE_DELETED], 'readonly');
+            const projectStore = transaction.objectStore(STORE_PROJECTS);
+            const deletedStore = transaction.objectStore(STORE_DELETED);
+            
+            const projectsRequest = projectStore.getAll();
+            const deletedRequest = deletedStore.getAll();
+            
+            projects = await new Promise((resolve) => {
+                projectsRequest.onsuccess = () => resolve(projectsRequest.result);
+            });
+            
+            deletedProjects = await new Promise((resolve) => {
+                deletedRequest.onsuccess = () => resolve(deletedRequest.result);
+            });
+            
+            // 状態を復元
+            const state = localStorage.getItem('scenario_state_v1');
+            if (state) {
+                const stateData = JSON.parse(state);
+                currentProjectId = stateData.currentProjectId;
+                projectCounter = stateData.projectCounter || 0;
+            }
+            
+            return projects.length > 0;
+        } catch (error) {
+            console.error('IndexedDB読み込みエラー:', error);
+            return false;
+        }
     }
 
     // ========================================
     // 初期化
     // ========================================
-    function init() {
-        const loaded = loadFromLocalStorage();
+    async function init() {
+        // IndexedDB初期化
+        await initIndexedDB();
+        
+        // LocalStorageからのマイグレーション実行
+        await migrateFromLocalStorage();
+        
+        // IndexedDBからデータ読み込み
+        const loaded = await loadFromIndexedDB();
         
         if (loaded && projects.length > 0) {
             restoreProjectState();
@@ -255,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
         projects.push(project);
         switchProject(project.id);
         renderTabs();
-        saveToLocalStorage();
+        saveToIndexedDB();
         return project;
     }
     
@@ -289,7 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
             switchProject(projects[newIdx].id);
         } else {
             renderTabs();
-            saveToLocalStorage();
+            saveToIndexedDB();
         }
     }
     
@@ -317,7 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 project.name = newName;
             }
             renderTabs();
-            saveToLocalStorage();
+            saveToIndexedDB();
         }
         
         input.addEventListener('blur', finishEdit);
@@ -595,7 +711,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderScenarioContent(scenarioContent);
             }
             
-            saveToLocalStorage();
+            saveToIndexedDB();
             
         } catch (error) {
             thinkingDiv.remove();
@@ -784,7 +900,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 再描画と保存
         renderScenarioContent(project.content);
-        saveToLocalStorage();
+        saveToIndexedDB();
         showToast('シナリオを削除しました');
     };
     
@@ -809,7 +925,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 再描画と保存
         renderScenarioContent(project.content);
-        saveToLocalStorage();
+        saveToIndexedDB();
         showToast('新しいシナリオを追加しました');
         
         // 新しく追加されたシナリオにフォーカス
@@ -844,7 +960,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 再描画と保存
         renderScenarioContent(project.content);
-        saveToLocalStorage();
+        saveToIndexedDB();
         showToast('シナリオを複製しました');
         
         // 複製されたシナリオにスクロール
@@ -884,7 +1000,7 @@ document.addEventListener('DOMContentLoaded', () => {
             project.content = scenarios.join('\n---\n');
         }
         
-        saveToLocalStorage();
+        saveToIndexedDB();
     }
     
     // 自動保存機能（レガシーサポート）
@@ -905,7 +1021,7 @@ document.addEventListener('DOMContentLoaded', () => {
             project.content = scenarios.join('\n---\n');
         }
         
-        saveToLocalStorage();
+        saveToIndexedDB();
     };
     
     // コピー機能をグローバルに公開
@@ -1006,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 再描画
         renderScenarioContent(project.content);
-        saveToLocalStorage();
+        saveToIndexedDB();
         
         // 成功メッセージ表示
         showToast('シナリオを更新しました');
@@ -1832,7 +1948,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // シナリオ更新
                 project.content = data.correctedContent;
                 renderScenarioContent(project.content);
-                saveToLocalStorage();
+                saveToIndexedDB();
                 
                 // マーカー削除
                 deleteMarker(markerId);
@@ -2073,7 +2189,7 @@ document.addEventListener('DOMContentLoaded', () => {
             markersList = [];
             updateMarkerUI();
             renderScenarioContent(project.content);
-            saveToLocalStorage();
+            saveToIndexedDB();
             
             // ツール選択を解除
             activeMarkerTool = null;
@@ -2150,7 +2266,7 @@ document.addEventListener('DOMContentLoaded', () => {
         projects.push(project);
         
         switchProject(project.id);
-        saveToLocalStorage();
+        saveToIndexedDB();
     }
     
     function deleteFromHistory(projectId, isDeleted) {
@@ -2177,9 +2293,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
-        saveToLocalStorage();
+        saveToIndexedDB();
     }
 
     // 初期化実行
     init();
 });
+
+    // ========================================
+    // ツール間通信
+    // ========================================
+    
+    // ツール間通信リスナー（js/app.jsからのプロジェクト切り替え）
+    window.addEventListener('message', (event) => {
+        if (event.data.type === 'switchProject' && event.data.projectId) {
+            switchProject(event.data.projectId);
+        }
+    });
+    

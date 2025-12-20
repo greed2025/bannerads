@@ -222,7 +222,7 @@ router.post('/image', async (req, res) => {
         if (images && images.length > 0) {
             res.json({
                 success: true,
-                image: images[0]
+                imageData: images[0]
             });
         } else {
             res.status(500).json({

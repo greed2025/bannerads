@@ -317,17 +317,19 @@ button {
     border-right: 1px solid var(--border-color);
     flex-shrink: 0;
     position: relative;
-    transition: width 0.1s ease;
+    transition: width 0.3s ease; /* 0.1s → 0.3s に変更で滑らかに */
 }
 
 .editors-area.collapsed {
     width: 0;
+    min-width: 0;
     border-right: none;
     overflow: visible; /* トグルボタンを表示するため */
 }
 
-.editors-area.collapsed .editor-section {
-    display: none;
+.editors-area.collapsed .editor-tabs,
+.editors-area.collapsed .editor-content {
+    display: none; /* タブとコンテンツを完全に非表示 */
 }
 
 .editors-toggle-btn {
@@ -948,7 +950,8 @@ button {
     align-items: flex-start;
     justify-content: center;
     padding: 20px;
-    overflow: auto;
+    overflow-x: auto; /* 横スクロールのみ許可 */
+    overflow-y: hidden; /* 縦スクロール無効化 */
 }
 
 /* スマホフレーム */
@@ -1235,7 +1238,8 @@ button {
     padding: 16px;
     border-top: 1px solid var(--border-color);
     display: flex;
-    flex-direction: column;
+    flex-direction: row; /* column → row に変更 */
+    align-items: flex-end; /* ボタンを入力欄と揃える */
     gap: 8px;
 }
 

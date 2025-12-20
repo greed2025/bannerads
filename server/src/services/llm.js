@@ -210,6 +210,25 @@ async function sendClaudeMessage(options) {
 }
 
 /**
+ * Claude テキスト生成（シンプル版）
+ */
+async function generateTextWithClaude(prompt, systemPrompt = '', messages = []) {
+    return await withRetry(async () => {
+        const apiMessages = [
+            ...messages,
+            { role: 'user', content: prompt }
+        ];
+        
+        const response = await sendClaudeMessage({
+            systemPrompt,
+            messages: apiMessages,
+            maxTokens: 8192
+        });
+        return response.content[0].text;
+    });
+}
+
+/**
  * OpenAI Whisper 文字起こし
  */
 async function transcribeWithWhisper(fileStream, filename) {
@@ -243,6 +262,7 @@ module.exports = {
     withRetry,
     generateImageWithGemini,
     generateTextWithGemini,
+    generateTextWithClaude,
     sendClaudeMessage,
     transcribeWithWhisper,
     getClientStatus,

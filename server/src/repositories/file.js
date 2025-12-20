@@ -169,6 +169,51 @@ function clearCache() {
     cache.writingStyle = null;
 }
 
+/**
+ * ファイル名の検証と正規化（パストラバーサル対策）
+ */
+function validateAndNormalizeFilename(filename) {
+    // 絶対パス拒否
+    if (path.isAbsolute(filename)) {
+        throw new Error('Absolute paths not allowed');
+    }
+    
+    // パス区切り文字を含む場合は拒否
+    if (filename.includes('/') || filename.includes('\\')) {
+        throw new Error('Path separators not allowed');
+    }
+    
+    // 安全な文字のみ許可
+    if (!/^[a-zA-Z0-9._-]+$/.test(filename)) {
+        throw new Error('Invalid characters');
+    }
+    
+    // .md 自動付与
+    return filename.endsWith('.md') ? filename : filename + '.md';
+}
+
+/**
+ * プロジェクトタイプの検証（動的ホワイトリスト）
+ */
+async function validateProjectType(projectType, scenariosPath) {
+    // 安全な文字チェック
+    if (!/^[a-z0-9_-]+$/.test(projectType)) {
+        throw new Error('Invalid project type');
+    }
+    
+    // 動的ホワイトリスト
+    const entries = await fs.readdir(scenariosPath, { withFileTypes: true });
+    const validTypes = entries
+        .filter(e => e.isDirectory())
+        .map(e => e.name);
+    
+    if (!validTypes.includes(projectType)) {
+        throw new Error(`Project type not found: ${projectType}`);
+    }
+    
+    return true;
+}
+
 module.exports = {
     // ナレッジ/スキル読み込み
     loadKnowledge,
@@ -185,6 +230,10 @@ module.exports = {
     writeText,
     deleteFile,
     listFiles,
+    
+    // セキュリティ
+    validateAndNormalizeFilename,
+    validateProjectType,
     
     // キャッシュ
     clearCache,

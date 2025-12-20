@@ -6,9 +6,10 @@
 // 定数
 const API_BASE_URL = '/api';
 const DB_NAME = 'LPBuilderDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;  // v1 → v2: deleted_projects追加
 const STORE_PROJECTS = 'projects';
 const STORE_TEMPLATES = 'templates';
+const STORE_DELETED = 'deleted_projects';  // 新規追加
 const MAX_PROJECT_SIZE_MB = 100;
 const WARNING_SIZE_MB = 80;
 const MAX_HISTORY_COUNT = 50;
@@ -64,6 +65,13 @@ async function initializeApp() {
             }, 200);
         });
         
+        // ツール間通信リスナー（js/app.jsからのプロジェクト切り替え）
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'switchProject' && event.data.projectId) {
+                openProject(event.data.projectId);
+            }
+        });
+        
         console.log('LP Builder initialized');
     } catch (error) {
         console.error('Initialization failed:', error);
@@ -98,6 +106,12 @@ function initDatabase() {
             if (!db.objectStoreNames.contains(STORE_TEMPLATES)) {
                 const templateStore = db.createObjectStore(STORE_TEMPLATES, { keyPath: 'id' });
                 templateStore.createIndex('createdAt', 'createdAt', { unique: false });
+            }
+            
+            // 削除済みプロジェクトストア（v2で追加）
+            if (!db.objectStoreNames.contains(STORE_DELETED)) {
+                const deletedStore = db.createObjectStore(STORE_DELETED, { keyPath: 'id' });
+                deletedStore.createIndex('deletedAt', 'deletedAt', { unique: false });
             }
         };
     });
@@ -1023,9 +1037,9 @@ async function generateImageForSelection() {
         
         const data = await response.json();
         
-        if (response.ok && data.image) {
-            // 画像タグを生成してエディタに挿入
-            const imgTag = `<img src="data:image/png;base64,${data.image}" alt="${escapeHtml(instruction)}" class="lp-generated-image">`;
+        if (response.ok && data.imageData) {
+            // 画像タグを生成してエディタに挿入（imageDataは既にdata URL形式）
+            const imgTag = `<img src="${data.imageData}" alt="${escapeHtml(instruction)}" class="lp-generated-image">`;
             
             const htmlEditor = state.editors.html;
             if (htmlEditor) {
@@ -1244,9 +1258,9 @@ async function generatePreviewImage(prompt) {
         
         const data = await response.json();
         
-        if (response.ok && data.image) {
-            // 画像タグを生成してHTMLに挿入
-            const imgTag = `<img src="data:image/png;base64,${data.image}" alt="${escapeHtml(prompt)}" class="lp-generated-image">`;
+        if (response.ok && data.imageData) {
+            // 画像タグを生成してHTMLに挿入（imageDataは既にdata URL形式）
+            const imgTag = `<img src="${data.imageData}" alt="${escapeHtml(prompt)}" class="lp-generated-image">`;
             
             const htmlEditor = state.editors.html;
             if (htmlEditor) {
@@ -2734,13 +2748,13 @@ function initImageModalEvents() {
             
             const data = await response.json();
             
-            if (data.success && data.image) {
-                generatedImageData = data.image;
+            if (data.success && data.imageData) {
+                generatedImageData = data.imageData;
                 
-                // プレビュー表示
+                // プレビュー表示（imageDataは既にdata URL形式）
                 const preview = modal.querySelector('.js-image-preview');
                 const img = preview.querySelector('img');
-                img.src = `data:image/png;base64,${data.image}`;
+                img.src = data.imageData;
                 preview.style.display = 'block';
                 
                 // ボタン切替
@@ -2770,9 +2784,8 @@ function initImageModalEvents() {
             const timestamp = Date.now();
             const filename = `generated_${timestamp}.webp`;
             
-            // WebP変換
-            const originalDataUrl = `data:image/png;base64,${generatedImageData}`;
-            const webpResult = await convertToWebP(originalDataUrl, 0.85);
+            // WebP変換（generatedImageDataは既にdata URL形式）
+            const webpResult = await convertToWebP(generatedImageData, 0.85);
             
             // 画像をプロジェクトに追加
             if (!state.currentProject.images) {

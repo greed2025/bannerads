@@ -1872,8 +1872,9 @@ ${instructions}
     // IndexedDB ストレージ
     // ========================================
     const DB_NAME = 'mixboard_db';
-    const DB_VERSION = 3;
+    const DB_VERSION = 4;  // v3 → v4: deleted_projects追加
     const STORE_NAME = 'projects';
+    const STORE_DELETED = 'deleted_projects';  // 新規追加
     
     function openDB() {
         return new Promise((resolve, reject) => {
@@ -1884,8 +1885,17 @@ ${instructions}
             
             request.onupgradeneeded = (e) => {
                 const db = e.target.result;
+                const oldVersion = e.oldVersion;
+                
+                // プロジェクトストア
                 if (!db.objectStoreNames.contains(STORE_NAME)) {
                     db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                }
+                
+                // 削除済みプロジェクトストア（v4で追加）
+                if (!db.objectStoreNames.contains(STORE_DELETED)) {
+                    const deletedStore = db.createObjectStore(STORE_DELETED, { keyPath: 'id' });
+                    deletedStore.createIndex('deletedAt', 'deletedAt', { unique: false });
                 }
             };
         });
@@ -1974,6 +1984,50 @@ ${instructions}
             console.error('Migration error:', error);
         }
     }
+    
+    // ========================================
+    // ツール間通信
+    // ========================================
+    
+    /**
+     * プロジェクトIDを指定して切り替え（js/app.jsからの呼び出し用）
+     */
+    async function switchToProject(projectId) {
+        try {
+            const db = await openDB();
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            
+            const request = store.get(projectId);
+            const project = await new Promise((resolve, reject) => {
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+            
+            if (project && project.elements) {
+                elements = project.elements;
+                selectedElementIds = [];
+                canvasContainer.innerHTML = '';
+                elements.forEach(el => renderElement(el));
+                showToast(`プロジェクトを切り替えました`, 'success');
+                await saveToIndexedDB();
+            } else {
+                showToast('プロジェクトが見つかりません', 'error');
+            }
+            
+            db.close();
+        } catch (error) {
+            console.error('Switch project error:', error);
+            showToast('プロジェクト切り替えに失敗しました', 'error');
+        }
+    }
+    
+    // ツール間通信リスナー
+    window.addEventListener('message', (event) => {
+        if (event.data.type === 'switchProject' && event.data.projectId) {
+            switchToProject(event.data.projectId);
+        }
+    });
     
     // 初期化実行
     init();
