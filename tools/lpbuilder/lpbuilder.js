@@ -344,6 +344,9 @@ function loadProjectToEditors(project) {
     
     // プレビュー更新
     updatePreview();
+    
+    // 画像グリッド更新
+    renderImagesGrid();
 }
 
 /**
@@ -1356,6 +1359,9 @@ function initEventListeners() {
     document.querySelector('.js-preview-edit-apply')?.addEventListener('click', () => {
         applyPreviewEdit();
     });
+    
+    // 画像管理
+    initImageManager();
     
     // チャット送信
     document.querySelector('.js-chat-send')?.addEventListener('click', () => {
@@ -2943,4 +2949,166 @@ document.addEventListener('DOMContentLoaded', () => {
         showTemplateModal();
     });
 });
+
+// ========================================
+// 画像管理機能
+// ========================================
+
+function initImageManager() {
+    const dropzone = document.querySelector('.js-images-dropzone');
+    const fileInput = document.querySelector('.js-images-file-input');
+    const addBtn = document.querySelector('.js-images-add-btn');
+    
+    if (!dropzone || !fileInput) return;
+    
+    // ドロップゾーンクリック
+    dropzone.addEventListener('click', () => {
+        fileInput.click();
+    });
+    
+    // 追加ボタンクリック
+    addBtn?.addEventListener('click', () => {
+        fileInput.click();
+    });
+    
+    // ファイル選択
+    fileInput.addEventListener('change', (e) => {
+        handleImageFiles(e.target.files);
+        fileInput.value = ''; // リセット
+    });
+    
+    // ドラッグ&ドロップ
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+    });
+    
+    dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('dragover');
+    });
+    
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        handleImageFiles(e.dataTransfer.files);
+    });
+    
+    // 初期表示
+    renderImagesGrid();
+}
+
+async function handleImageFiles(files) {
+    if (!state.currentProject) return;
+    
+    if (!state.currentProject.images) {
+        state.currentProject.images = [];
+    }
+    
+    for (const file of files) {
+        if (!file.type.startsWith('image/')) continue;
+        
+        try {
+            const dataUrl = await readFileAsDataURL(file);
+            state.currentProject.images.push({
+                id: generateId(),
+                name: file.name,
+                dataUrl: dataUrl,
+                type: file.type,
+                size: file.size
+            });
+        } catch (error) {
+            console.error('Failed to read image:', error);
+        }
+    }
+    
+    renderImagesGrid();
+    updatePreview();
+    saveCurrentState();
+    showToast(`${files.length}枚の画像を追加しました`, 'success');
+}
+
+function readFileAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+function renderImagesGrid() {
+    const grid = document.querySelector('.js-images-grid');
+    if (!grid) return;
+    
+    const images = state.currentProject?.images || [];
+    
+    if (images.length === 0) {
+        grid.innerHTML = '';
+        return;
+    }
+    
+    grid.innerHTML = images.map(img => `
+        <div class="image-item" data-id="${img.id}">
+            <img src="${img.dataUrl}" alt="${escapeHtml(img.name)}">
+            <div class="image-item-overlay">
+                <button class="image-item-btn copy" title="HTMLにコピー" data-id="${img.id}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                </button>
+                <button class="image-item-btn delete" title="削除" data-id="${img.id}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="image-item-name">${escapeHtml(img.name)}</div>
+        </div>
+    `).join('');
+    
+    // イベントリスナー
+    grid.querySelectorAll('.image-item-btn.copy').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            copyImageToEditor(btn.dataset.id);
+        });
+    });
+    
+    grid.querySelectorAll('.image-item-btn.delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteImage(btn.dataset.id);
+        });
+    });
+}
+
+function copyImageToEditor(imageId) {
+    const image = state.currentProject?.images?.find(img => img.id === imageId);
+    if (!image) return;
+    
+    // imgタグを生成してHTMLエディタのカーソル位置に挿入
+    const imgTag = `<img src="img/${image.name}" alt="${escapeHtml(image.name)}" class="lp-generated-image">`;
+    
+    const htmlEditor = state.editors.html;
+    if (htmlEditor) {
+        htmlEditor.replaceSelection(imgTag);
+        htmlEditor.focus();
+    }
+    
+    showToast('画像タグをコピーしました', 'success');
+}
+
+function deleteImage(imageId) {
+    if (!state.currentProject?.images) return;
+    
+    if (!confirm('この画像を削除しますか？')) return;
+    
+    state.currentProject.images = state.currentProject.images.filter(img => img.id !== imageId);
+    renderImagesGrid();
+    updatePreview();
+    saveCurrentState();
+    showToast('画像を削除しました', 'info');
+}
 
