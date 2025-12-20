@@ -362,23 +362,36 @@ button {
     transform: rotate(180deg);
 }
 
-/* 画像セクション */
-.images-section .editor-section-header {
-    justify-content: space-between;
+/* 画像パネル */
+.images-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.images-header {
+    padding: 12px;
+    background: var(--color-gray-800);
+    border-bottom: 1px solid var(--color-gray-700);
 }
 
 .images-add-btn {
-    background: none;
+    background: var(--color-primary);
     border: none;
     cursor: pointer;
-    color: var(--color-gray-400);
-    padding: 4px;
-    border-radius: 4px;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all var(--transition-fast);
 }
 
 .images-add-btn:hover {
-    background: var(--color-gray-700);
-    color: var(--color-white);
+    background: var(--color-primary-hover);
 }
 
 .images-wrapper {
@@ -589,52 +602,55 @@ button {
     background: var(--color-gray-200);
 }
 
-.editor-section {
+/* エディタタブバー */
+.editor-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 8px 0 8px;
+    background: var(--color-gray-900);
+    border-bottom: 1px solid var(--color-gray-700);
+}
+
+.editor-tab {
+    flex: 1;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--color-gray-400);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.editor-tab:hover {
+    color: var(--color-white);
+    background: var(--color-gray-800);
+}
+
+.editor-tab.active {
+    color: var(--color-white);
+    border-bottom-color: var(--color-primary);
+}
+
+/* エディタコンテンツ */
+.editor-content {
     flex: 1;
     display: flex;
     flex-direction: column;
-    min-height: 80px;
-    border-bottom: 1px solid var(--color-gray-700);
-    position: relative;
+    min-height: 0;
 }
 
-.editor-section:last-child {
-    border-bottom: none;
+.editor-panel {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
 }
 
-/* セクションリサイズバー */
-.section-resize-bar {
-    height: 6px;
-    background: transparent;
-    cursor: ns-resize;
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 5;
-}
-
-.section-resize-bar:hover,
-.section-resize-bar.resizing {
-    background: var(--color-primary);
-}
-
-.editor-section-header {
+.editor-panel.active {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 12px;
-    background: var(--color-gray-800);
-    border-bottom: 1px solid var(--color-gray-700);
-    flex-shrink: 0;
-}
-
-.editor-section-label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: var(--color-gray-400);
-    letter-spacing: 0.05em;
 }
 
 /* ========================================

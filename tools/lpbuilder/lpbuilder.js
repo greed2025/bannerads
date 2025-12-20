@@ -1363,8 +1363,8 @@ function initEventListeners() {
     // 画像管理
     initImageManager();
     
-    // セクションリサイズ
-    initSectionResize();
+    // エディタタブ切り替え
+    initEditorTabs();
     
     // チャット送信
     document.querySelector('.js-chat-send')?.addEventListener('click', () => {
@@ -2954,50 +2954,33 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ========================================
-// セクションリサイズ機能
+// エディタタブ切り替え機能
 // ========================================
 
-function initSectionResize() {
-    const resizeBars = document.querySelectorAll('.js-section-resize-bar');
+function initEditorTabs() {
+    const tabs = document.querySelectorAll('.js-editor-tab');
+    const panels = document.querySelectorAll('.js-editor-panel');
     
-    resizeBars.forEach(bar => {
-        let isResizing = false;
-        let startY = 0;
-        let startHeight = 0;
-        let section = null;
-        
-        bar.addEventListener('mousedown', (e) => {
-            isResizing = true;
-            section = bar.closest('.js-resizable-section');
-            startY = e.clientY;
-            startHeight = section.offsetHeight;
-            bar.classList.add('resizing');
-            document.body.style.cursor = 'ns-resize';
-            document.body.style.userSelect = 'none';
-            e.preventDefault();
-        });
-        
-        document.addEventListener('mousemove', (e) => {
-            if (!isResizing || !section) return;
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
             
-            const deltaY = e.clientY - startY;
-            const newHeight = Math.max(80, startHeight + deltaY);
-            section.style.flex = 'none';
-            section.style.height = newHeight + 'px';
-        });
-        
-        document.addEventListener('mouseup', () => {
-            if (!isResizing) return;
-            isResizing = false;
-            bar.classList.remove('resizing');
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
+            // タブの切り替え
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // パネルの切り替え
+            panels.forEach(p => p.classList.remove('active'));
+            const targetPanel = document.querySelector(`.js-editor-panel[data-panel="${tabName}"]`);
+            if (targetPanel) {
+                targetPanel.classList.add('active');
+            }
             
             // エディタをリフレッシュ
             setTimeout(() => {
-                state.editors.html?.refresh();
-                state.editors.css?.refresh();
-                state.editors.js?.refresh();
+                if (tabName === 'html') state.editors.html?.refresh();
+                if (tabName === 'css') state.editors.css?.refresh();
+                if (tabName === 'js') state.editors.js?.refresh();
             }, 50);
         });
     });
