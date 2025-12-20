@@ -819,6 +819,25 @@ function handleEditorChange(type) {
     }, 500);
 }
 
+// 選択修正モード
+let isSelectionModeActive = false;
+
+function toggleSelectionMode() {
+    isSelectionModeActive = !isSelectionModeActive;
+    
+    const btn = document.querySelector('.js-selection-mode-btn');
+    if (btn) {
+        btn.classList.toggle('active', isSelectionModeActive);
+    }
+    
+    if (isSelectionModeActive) {
+        showToast('選択修正モード: コードを選択してください', 'info');
+    } else {
+        hideSelectionPanel();
+        showToast('選択修正モードを終了しました', 'info');
+    }
+}
+
 // 選択状態
 let currentSelection = {
     editorType: null,
@@ -831,6 +850,9 @@ let currentSelection = {
 let selectionTimeout = null;
 
 function handleEditorSelection(type) {
+    // 選択モードが無効なら何もしない
+    if (!isSelectionModeActive) return;
+    
     if (selectionTimeout) {
         clearTimeout(selectionTimeout);
     }
@@ -989,6 +1011,11 @@ function initEventListeners() {
         if (window.parent !== window) {
             window.parent.postMessage({ type: 'navigateBack' }, '*');
         }
+    });
+    
+    // 選択修正モードボタン
+    document.querySelector('.js-selection-mode-btn')?.addEventListener('click', () => {
+        toggleSelectionMode();
     });
     
     // 新規タブ追加ボタン

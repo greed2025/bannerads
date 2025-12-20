@@ -286,6 +286,12 @@ button {
     background: var(--color-gray-50);
 }
 
+.btn-secondary.active {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
 /* ========================================
    メインエリア
    ======================================== */
@@ -314,7 +320,9 @@ button {
 }
 
 .editors-area.collapsed {
-    width: 40px;
+    width: 0;
+    overflow: hidden;
+    border-right: none;
 }
 
 .editors-area.collapsed .editor-section {
@@ -323,7 +331,7 @@ button {
 
 .editors-toggle-btn {
     position: absolute;
-    right: -12px;
+    right: -24px;
     top: 50%;
     transform: translateY(-50%);
     width: 24px;
@@ -343,6 +351,10 @@ button {
 .editors-toggle-btn:hover {
     background: var(--color-gray-700);
     color: var(--color-white);
+}
+
+.editors-area.collapsed .editors-toggle-btn {
+    right: -24px;
 }
 
 .editors-area.collapsed .editors-toggle-btn svg {
