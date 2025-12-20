@@ -368,6 +368,72 @@ button {
     color: var(--color-gray-600);
 }
 
+.preview-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.preview-mode-toggle {
+    display: flex;
+    background: var(--color-gray-100);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+}
+
+.preview-mode-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 28px;
+    border-radius: var(--radius-xs);
+    color: var(--color-gray-500);
+    transition: all var(--transition-fast);
+}
+
+.preview-mode-btn:hover {
+    color: var(--color-gray-700);
+}
+
+.preview-mode-btn.active {
+    background: var(--color-white);
+    color: var(--color-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* デスクトップフレーム */
+.desktop-frame {
+    width: 100%;
+    height: 100%;
+    background: var(--color-white);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.desktop-frame iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.preview-wrapper[data-mode="desktop"] {
+    padding: 16px;
+}
+
+.preview-wrapper[data-mode="desktop"] .smartphone-frame {
+    display: none;
+}
+
+.preview-wrapper[data-mode="desktop"] .desktop-frame {
+    display: block !important;
+}
+
+.preview-wrapper[data-mode="mobile"] .desktop-frame {
+    display: none !important;
+}
+
 /* タブヘッダー */
 .tab-header {
     display: flex;

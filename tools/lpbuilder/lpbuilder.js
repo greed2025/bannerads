@@ -236,7 +236,7 @@ async function restoreTabsOrCreateNew() {
         
         // タブUI更新
         renderProjectTabs();
-        renderProjectHistory();
+
         saveTabState();
         
     } catch (error) {
@@ -244,7 +244,7 @@ async function restoreTabsOrCreateNew() {
         // エラー時も新規タブ作成
         await createNewProjectTab();
         renderProjectTabs();
-        renderProjectHistory();
+
     }
 }
 
@@ -329,7 +329,7 @@ function renderProjectTabs() {
     
     tabList.innerHTML = tabs.map(tab => `
         <div class="project-tab ${tab.id === activeTabId ? 'active' : ''}" data-tab-id="${tab.id}">
-            <span class="project-tab-name" data-tab-id="${tab.id}">${escapeHtml(tab.name)}</span>
+            <span class="project-tab-name" contenteditable="true" data-tab-id="${tab.id}" spellcheck="false">${escapeHtml(tab.name)}</span>
             ${tab.isDirty ? '<span class="project-tab-dirty"></span>' : ''}
             <button class="project-tab-close" data-tab-id="${tab.id}">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -349,19 +349,36 @@ function renderProjectTabs() {
     tabList.querySelectorAll('.project-tab').forEach(tabEl => {
         tabEl.addEventListener('click', async (e) => {
             if (e.target.closest('.project-tab-close')) return;
-            if (e.target.classList.contains('project-tab-name-input')) return;
+            // 編集中はタブ切替しない
+            if (e.target.classList.contains('project-tab-name') && 
+                document.activeElement === e.target) return;
             
             const tabId = tabEl.dataset.tabId;
             await switchToTab(tabId);
         });
     });
     
-    // タブ名ダブルクリックで編集
+    // タブ名編集イベント
     tabList.querySelectorAll('.project-tab-name').forEach(nameEl => {
-        nameEl.addEventListener('dblclick', (e) => {
-            e.stopPropagation();
-            const tabId = nameEl.dataset.tabId;
-            startEditTabName(tabId, nameEl);
+        const tabId = nameEl.dataset.tabId;
+        
+        // フォーカス解除で保存
+        nameEl.addEventListener('blur', async () => {
+            await saveTabName(tabId, nameEl.textContent.trim());
+        });
+        
+        // Enterで確定
+        nameEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                nameEl.blur();
+            }
+            if (e.key === 'Escape') {
+                // 元に戻す
+                const tab = state.tabManager.getTabs().find(t => t.id === tabId);
+                if (tab) nameEl.textContent = tab.name;
+                nameEl.blur();
+            }
         });
     });
     
@@ -376,59 +393,28 @@ function renderProjectTabs() {
 }
 
 /**
- * タブ名編集を開始
+ * タブ名を保存
  */
-function startEditTabName(tabId, nameEl) {
-    const currentName = nameEl.textContent;
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'project-tab-name-input';
-    input.value = currentName;
-    input.style.cssText = `
-        width: 100px;
-        background: var(--color-white);
-        border: 1px solid var(--color-primary);
-        border-radius: 4px;
-        padding: 2px 6px;
-        font-size: 12px;
-        outline: none;
-    `;
+async function saveTabName(tabId, newName) {
+    const tab = state.tabManager.getTabs().find(t => t.id === tabId);
+    if (!tab) return;
     
-    nameEl.replaceWith(input);
-    input.focus();
-    input.select();
+    const finalName = newName || tab.name;
+    if (finalName === tab.name) return;
     
-    const finishEdit = async () => {
-        const newName = input.value.trim() || currentName;
-        
-        // タブ名を更新
-        state.tabManager.renameTab(tabId, newName);
-        
-        // プロジェクト名も更新
-        const tab = state.tabManager.getTabs().find(t => t.id === tabId);
-        if (tab && tab.projectId) {
-            const project = await loadProject(tab.projectId);
-            if (project) {
-                project.name = newName;
-                await saveProject(project);
-            }
-        }
-        
-        saveTabState();
-        renderProjectTabs();
-    };
+    // タブ名を更新
+    state.tabManager.renameTab(tabId, finalName);
     
-    input.addEventListener('blur', finishEdit);
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            input.blur();
+    // プロジェクト名も更新
+    if (tab.projectId) {
+        const project = await loadProject(tab.projectId);
+        if (project) {
+            project.name = finalName;
+            await saveProject(project);
         }
-        if (e.key === 'Escape') {
-            input.value = currentName;
-            input.blur();
-        }
-    });
+    }
+    
+    saveTabState();
 }
 
 /**
@@ -474,7 +460,7 @@ async function closeProjectTab(tabId) {
     await loadActiveTabProject();
     
     renderProjectTabs();
-    renderProjectHistory();
+
     saveTabState();
 }
 
@@ -553,7 +539,7 @@ async function openProjectAsNewTab(projectId) {
     loadProjectToEditors(project);
     
     renderProjectTabs();
-    renderProjectHistory();
+
     saveTabState();
 }
 
@@ -840,6 +826,14 @@ function initEventListeners() {
         });
     });
     
+    // プレビューモード切替（スマホ/PC）
+    document.querySelectorAll('.js-preview-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const mode = btn.dataset.mode;
+            setPreviewMode(mode);
+        });
+    });
+    
     // プレビュー更新
     document.querySelector('.js-refresh-btn')?.addEventListener('click', () => {
         updatePreview();
@@ -982,15 +976,42 @@ function setViewport(viewport) {
 // プレビュー管理
 // ========================================
 
+// 現在のプレビューモード
+let currentPreviewMode = 'mobile';
+
+function setPreviewMode(mode) {
+    currentPreviewMode = mode;
+    
+    // ボタンの状態更新
+    document.querySelectorAll('.js-preview-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+    
+    // プレビューラッパーのdata-mode更新
+    const wrapper = document.querySelector('.js-preview-wrapper');
+    if (wrapper) {
+        wrapper.dataset.mode = mode;
+    }
+    
+    // プレビュー更新
+    updatePreview();
+}
+
 function updatePreview() {
-    const iframe = document.querySelector('.js-preview-iframe');
-    if (!iframe || !state.currentProject) return;
+    const mobileIframe = document.querySelector('.js-preview-iframe');
+    const desktopIframe = document.querySelector('.js-preview-iframe-desktop');
+    if (!state.currentProject) return;
     
     // プレビュー用HTMLを組み立て（CSS/JSをインライン化）
     const previewHtml = buildPreviewHtml();
     
-    // srcdocで注入
-    iframe.srcdoc = previewHtml;
+    // 両方のiframeを更新
+    if (mobileIframe) {
+        mobileIframe.srcdoc = previewHtml;
+    }
+    if (desktopIframe) {
+        desktopIframe.srcdoc = previewHtml;
+    }
 }
 
 function buildPreviewHtml() {

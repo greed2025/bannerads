@@ -113,21 +113,43 @@
             <div class="preview-area">
                 <div class="preview-header">
                     <span class="preview-title">プレビュー</span>
-                    <button class="action-btn js-refresh-btn" title="プレビュー更新">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="23 4 23 10 17 10"/>
-                            <polyline points="1 20 1 14 7 14"/>
-                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                        </svg>
-                    </button>
+                    <div class="preview-controls">
+                        <div class="preview-mode-toggle">
+                            <button class="preview-mode-btn active js-preview-mode-btn" data-mode="mobile" title="スマホ表示">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                                    <line x1="12" y1="18" x2="12.01" y2="18"/>
+                                </svg>
+                            </button>
+                            <button class="preview-mode-btn js-preview-mode-btn" data-mode="desktop" title="PC表示">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                                    <line x1="8" y1="21" x2="16" y2="21"/>
+                                    <line x1="12" y1="17" x2="12" y2="21"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <button class="action-btn js-refresh-btn" title="プレビュー更新">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"/>
+                                <polyline points="1 20 1 14 7 14"/>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-                <div class="preview-wrapper">
-                    <div class="smartphone-frame">
+                <div class="preview-wrapper js-preview-wrapper" data-mode="mobile">
+                    <!-- スマホモード -->
+                    <div class="smartphone-frame js-smartphone-frame">
                         <div class="smartphone-notch"></div>
                         <div class="smartphone-screen">
                             <iframe class="preview-iframe js-preview-iframe" sandbox="allow-scripts"></iframe>
                         </div>
                         <div class="smartphone-home-indicator"></div>
+                    </div>
+                    <!-- PCモード（iframeは共有） -->
+                    <div class="desktop-frame js-desktop-frame" style="display: none;">
+                        <iframe class="preview-iframe-desktop js-preview-iframe-desktop" sandbox="allow-scripts"></iframe>
                     </div>
                 </div>
             </div>
@@ -140,16 +162,6 @@
                     </svg>
                 </button>
                 <div class="panel-content">
-                    <!-- プロジェクト履歴セクション -->
-                    <div class="project-history-section">
-                        <div class="panel-header">
-                            <h2>プロジェクト履歴</h2>
-                        </div>
-                        <div class="project-history-list js-project-history-list">
-                            <!-- JSで動的に生成 -->
-                        </div>
-                    </div>
-                    
                     <!-- AIアシスタントセクション -->
                     <div class="ai-chat-section">
                         <div class="panel-header">
