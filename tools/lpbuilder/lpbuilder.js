@@ -55,9 +55,21 @@ async function initializeApp() {
         // タブ状態復元または新規タブ作成
         await restoreTabsOrCreateNew();
         
+        // ウィンドウリサイズ時にスマホフレームのスケールを再調整
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                adjustSmartphoneFrameScale();
+            }, 200);
+        });
+        
         console.log('LP Builder initialized');
     } catch (error) {
         console.error('Initialization failed:', error);
+        showToast('初期化に失敗しました', 'error');
+    }
+}
         showToast('初期化に失敗しました', 'error');
     }
 }
@@ -1514,6 +1526,41 @@ function setPreviewMode(mode) {
     updatePreview();
 }
 
+/**
+ * スマホフレームのスケールを調整してプレビューエリアに収める
+ */
+function adjustSmartphoneFrameScale() {
+    if (currentPreviewMode !== 'mobile') return;
+    
+    const frame = document.querySelector('.js-smartphone-frame');
+    const wrapper = document.querySelector('.js-preview-wrapper');
+    
+    if (!frame || !wrapper) return;
+    
+    // フレームの実際のサイズ（CSS設定値）
+    const frameWidth = 430;
+    const frameHeight = 932;
+    
+    // プレビューラッパーの利用可能なサイズ（paddingを除く）
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const availableWidth = wrapperRect.width - 40; // padding 20px * 2
+    const availableHeight = wrapperRect.height - 40; // padding 20px * 2
+    
+    // スケール比率を計算（縦横どちらか小さい方に合わせる）
+    const scaleX = availableWidth / frameWidth;
+    const scaleY = availableHeight / frameHeight;
+    const scale = Math.min(scaleX, scaleY, 1); // 最大でも1（拡大しない）
+    
+    // スケールを適用
+    if (scale < 1) {
+        frame.style.transform = `scale(${scale})`;
+        frame.style.transformOrigin = 'top center';
+    } else {
+        frame.style.transform = '';
+        frame.style.transformOrigin = '';
+    }
+}
+
 function updatePreview() {
     const mobileIframe = document.querySelector('.js-preview-iframe');
     const desktopIframe = document.querySelector('.js-preview-iframe-desktop');
@@ -1539,6 +1586,9 @@ function updatePreview() {
         desktopIframe.onload = reEnableSelection;
         desktopIframe.srcdoc = previewHtml;
     }
+    
+    // スマホフレームのスケール調整（画面に収まるように）
+    adjustSmartphoneFrameScale();
 }
 
 function buildPreviewHtml() {
@@ -1554,11 +1604,26 @@ function buildPreviewHtml() {
     if (project.images) {
         project.images.forEach(img => {
             if (img.dataUrl) {
+                // 画像名の正規表現メタ文字をエスケープ
+                const escapedName = img.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 // 相対パスをデータURLに置換
-                const regex = new RegExp(`(src=["'])(?:img/)?${img.name}(["'])`, 'gi');
+                const regex = new RegExp(`(src=["'])(?:img/)?${escapedName}(["'])`, 'gi');
                 html = html.replace(regex, `$1${img.dataUrl}$2`);
             }
         });
+    }
+    
+    // viewportの自動挿入（モバイルプレビュー時のみ、保存データには反映しない）
+    if (currentPreviewMode === 'mobile' && !html.includes('name="viewport"')) {
+        const viewportTag = '<meta name="viewport" content="width=device-width, initial-scale=1.0">';
+        if (html.includes('</head>')) {
+            html = html.replace('</head>', `    ${viewportTag}\n</head>`);
+        } else if (html.includes('<head>')) {
+            html = html.replace('<head>', `<head>\n    ${viewportTag}`);
+        } else {
+            // headタグもない場合は先頭に追加
+            html = `<!DOCTYPE html>\n<html>\n<head>\n    ${viewportTag}\n</head>\n<body>\n${html}\n</body>\n</html>`;
+        }
     }
     
     // CSSをインライン化（style.cssのlinkタグを置換）
@@ -1583,9 +1648,10 @@ function buildPreviewHtml() {
     // プレビューでは外部読み込みを許可するためsandbox属性を調整
     
     // JSをインライン化（script.jsのscriptタグを置換）
+    // 改善: 改行や属性を含むscriptタグにも対応
     const originalHtml2 = html;
     html = html.replace(
-        /<script[^>]*src=["'][^"']*script\.js["'][^>]*><\/script>/gi,
+        /<script\s+[^>]*src=["'][^"']*script\.js["'][^>]*>\s*<\/script>/gis,
         `<script>${js}</script>`
     );
     
