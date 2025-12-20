@@ -1363,6 +1363,9 @@ function initEventListeners() {
     // 画像管理
     initImageManager();
     
+    // セクションリサイズ
+    initSectionResize();
+    
     // チャット送信
     document.querySelector('.js-chat-send')?.addEventListener('click', () => {
         sendChatMessage();
@@ -2949,6 +2952,56 @@ document.addEventListener('DOMContentLoaded', () => {
         showTemplateModal();
     });
 });
+
+// ========================================
+// セクションリサイズ機能
+// ========================================
+
+function initSectionResize() {
+    const resizeBars = document.querySelectorAll('.js-section-resize-bar');
+    
+    resizeBars.forEach(bar => {
+        let isResizing = false;
+        let startY = 0;
+        let startHeight = 0;
+        let section = null;
+        
+        bar.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            section = bar.closest('.js-resizable-section');
+            startY = e.clientY;
+            startHeight = section.offsetHeight;
+            bar.classList.add('resizing');
+            document.body.style.cursor = 'ns-resize';
+            document.body.style.userSelect = 'none';
+            e.preventDefault();
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing || !section) return;
+            
+            const deltaY = e.clientY - startY;
+            const newHeight = Math.max(80, startHeight + deltaY);
+            section.style.flex = 'none';
+            section.style.height = newHeight + 'px';
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (!isResizing) return;
+            isResizing = false;
+            bar.classList.remove('resizing');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            
+            // エディタをリフレッシュ
+            setTimeout(() => {
+                state.editors.html?.refresh();
+                state.editors.css?.refresh();
+                state.editors.js?.refresh();
+            }, 50);
+        });
+    });
+}
 
 // ========================================
 // 画像管理機能
