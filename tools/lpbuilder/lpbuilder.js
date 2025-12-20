@@ -299,6 +299,13 @@ function loadProjectToEditors(project) {
         state.editors.js.setValue(project.files?.js || '');
     }
     
+    // エディタをリフレッシュ（新しいレイアウトで表示を更新）
+    setTimeout(() => {
+        state.editors.html?.refresh();
+        state.editors.css?.refresh();
+        state.editors.js?.refresh();
+    }, 50);
+    
     // チャット履歴復元
     state.chatHistory = project.chatHistory || [];
     renderChatHistory();

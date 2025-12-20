@@ -76,86 +76,61 @@
 
         <!-- メインコンテンツ -->
         <div class="lpbuilder-main">
-            <!-- 中央: プレビュー・エディタエリア -->
-            <div class="center-area">
-                <!-- コードタブヘッダー -->
-                <div class="tab-header">
-                    <div class="tab-list">
-                        <button class="tab-btn active js-tab-btn" data-tab="preview">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                <circle cx="12" cy="12" r="3"/>
-                            </svg>
-                            プレビュー
-                        </button>
-                        <button class="tab-btn js-tab-btn" data-tab="html">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="16 18 22 12 16 6"/>
-                                <polyline points="8 6 2 12 8 18"/>
-                            </svg>
-                            HTML
-                        </button>
-                        <button class="tab-btn js-tab-btn" data-tab="css">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                                <path d="M22 6l-10 7L2 6"/>
-                            </svg>
-                            CSS
-                        </button>
-                        <button class="tab-btn js-tab-btn" data-tab="js">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-                            </svg>
-                            JS
-                        </button>
+            <!-- 左側: エディタエリア（3分割） -->
+            <div class="editors-area">
+                <!-- HTMLエディタ -->
+                <div class="editor-section">
+                    <div class="editor-section-header">
+                        <span class="editor-section-label">HTML</span>
                     </div>
-                    <div class="tab-actions">
-                        <button class="action-btn js-refresh-btn" title="プレビュー更新">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="23 4 23 10 17 10"/>
-                                <polyline points="1 20 1 14 7 14"/>
-                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                            </svg>
-                        </button>
+                    <div class="editor-wrapper">
+                        <textarea class="editor-textarea js-editor-html"></textarea>
                     </div>
                 </div>
-
-                <!-- タブコンテンツ -->
-                <div class="tab-content">
-                    <!-- プレビュータブ（スマホフレーム） -->
-                    <div class="tab-panel active" data-panel="preview">
-                        <div class="preview-wrapper">
-                            <div class="smartphone-frame">
-                                <div class="smartphone-notch"></div>
-                                <div class="smartphone-screen">
-                                    <iframe class="preview-iframe js-preview-iframe" sandbox="allow-scripts"></iframe>
-                                </div>
-                                <div class="smartphone-home-indicator"></div>
-                            </div>
-                        </div>
+                
+                <!-- CSSエディタ -->
+                <div class="editor-section">
+                    <div class="editor-section-header">
+                        <span class="editor-section-label">CSS</span>
                     </div>
-
-                    <!-- HTMLタブ -->
-                    <div class="tab-panel" data-panel="html">
-                        <div class="editor-wrapper">
-                            <textarea class="editor-textarea js-editor-html"></textarea>
-                        </div>
-                    </div>
-
-                    <!-- CSSタブ -->
-                    <div class="tab-panel" data-panel="css">
-                        <div class="editor-wrapper">
-                            <textarea class="editor-textarea js-editor-css"></textarea>
-                        </div>
-                    </div>
-
-                    <!-- JSタブ -->
-                    <div class="tab-panel" data-panel="js">
-                        <div class="editor-wrapper">
-                            <textarea class="editor-textarea js-editor-js"></textarea>
-                        </div>
+                    <div class="editor-wrapper">
+                        <textarea class="editor-textarea js-editor-css"></textarea>
                     </div>
                 </div>
+                
+                <!-- JSエディタ -->
+                <div class="editor-section">
+                    <div class="editor-section-header">
+                        <span class="editor-section-label">JS</span>
+                    </div>
+                    <div class="editor-wrapper">
+                        <textarea class="editor-textarea js-editor-js"></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右側: プレビューエリア -->
+            <div class="preview-area">
+                <div class="preview-header">
+                    <span class="preview-title">プレビュー</span>
+                    <button class="action-btn js-refresh-btn" title="プレビュー更新">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"/>
+                            <polyline points="1 20 1 14 7 14"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="preview-wrapper">
+                    <div class="smartphone-frame">
+                        <div class="smartphone-notch"></div>
+                        <div class="smartphone-screen">
+                            <iframe class="preview-iframe js-preview-iframe" sandbox="allow-scripts"></iframe>
+                        </div>
+                        <div class="smartphone-home-indicator"></div>
+                    </div>
+                </div>
+            </div>
 
                 <!-- AI修正指示パネル -->
                 <div class="ai-instruction-panel">
