@@ -19,7 +19,7 @@ const lpRoutes = require('./routes/lp');
 const { errorHandler, requestLogger } = require('./middleware/errorHandler');
 
 // サービスから状態取得（ログ出力のため）
-const { getClientStatus, generateTextWithGemini, generateImageWithGemini } = require('./services/llm');
+const { getClientStatus, generateTextWithGemini, generateTextWithClaude, generateImageWithGemini } = require('./services/llm');
 
 // Expressアプリ初期化
 const app = express();
@@ -175,6 +175,171 @@ app.post('/api/test/gemini', async (req, res) => {
         console.error('Gemini Test Error:', error);
         res.status(500).json({
             error: 'Gemini APIエラー',
+            message: error.message
+        });
+    }
+});
+
+// ========================================
+// LP Builder API
+// ========================================
+
+// LP Builder - 要素修正API
+app.post('/api/lp/modify-element', async (req, res) => {
+    try {
+        const clientStatus = getClientStatus();
+        if (!clientStatus.claude && !clientStatus.gemini) {
+            return res.status(400).json({ 
+                error: 'AIクライアントが初期化されていません',
+                message: 'API KEYを.envに設定してください'
+            });
+        }
+        
+        const { elementHtml, instruction, fullHtml } = req.body;
+        
+        if (!elementHtml || !instruction) {
+            return res.status(400).json({ error: 'elementHtmlとinstructionが必要です' });
+        }
+        
+        console.log(`📝 LP要素修正: "${instruction.substring(0, 50)}..."`);
+        
+        const prompt = `あなたはHTML/CSSの専門家です。以下のHTMLの一部を修正してください。
+
+## 修正対象の要素
+\`\`\`html
+${elementHtml}
+\`\`\`
+
+## 修正指示
+${instruction}
+
+## 全体HTML（参考）
+\`\`\`html
+${fullHtml.substring(0, 3000)}${fullHtml.length > 3000 ? '...(省略)' : ''}
+\`\`\`
+
+## 出力形式
+修正後の全体HTMLのみを出力してください。修正対象の要素を修正指示に従って変更し、全体HTMLに適用した結果を返してください。コードブロックや説明は不要です。HTMLのみを出力してください。`;
+
+        let modifiedHtml;
+        if (clientStatus.claude) {
+            modifiedHtml = await generateTextWithClaude(prompt);
+        } else {
+            modifiedHtml = await generateTextWithGemini(prompt);
+        }
+        
+        // HTMLタグを抽出（コードブロックがあれば除去）
+        modifiedHtml = modifiedHtml.replace(/```html\n?/gi, '').replace(/```\n?/g, '').trim();
+        
+        res.json({
+            success: true,
+            modifiedHtml: modifiedHtml
+        });
+        
+    } catch (error) {
+        console.error('LP Modify Element Error:', error);
+        res.status(500).json({
+            error: '要素修正エラー',
+            message: error.message
+        });
+    }
+});
+
+// LP Builder - コード選択修正API
+app.post('/api/lp/modify-selection', async (req, res) => {
+    try {
+        const clientStatus = getClientStatus();
+        if (!clientStatus.claude && !clientStatus.gemini) {
+            return res.status(400).json({ 
+                error: 'AIクライアントが初期化されていません'
+            });
+        }
+        
+        const { selectedCode, instruction, codeType } = req.body;
+        
+        if (!selectedCode || !instruction) {
+            return res.status(400).json({ error: 'selectedCodeとinstructionが必要です' });
+        }
+        
+        console.log(`📝 LPコード修正(${codeType}): "${instruction.substring(0, 50)}..."`);
+        
+        const prompt = `あなたは${codeType.toUpperCase()}の専門家です。以下のコードを修正してください。
+
+## 修正対象のコード
+\`\`\`${codeType}
+${selectedCode}
+\`\`\`
+
+## 修正指示
+${instruction}
+
+## 出力形式
+修正後のコードのみを出力してください。コードブロックや説明は不要です。`;
+
+        let modifiedCode;
+        if (clientStatus.claude) {
+            modifiedCode = await generateTextWithClaude(prompt);
+        } else {
+            modifiedCode = await generateTextWithGemini(prompt);
+        }
+        
+        // コードブロックを除去
+        modifiedCode = modifiedCode.replace(/```\w*\n?/gi, '').replace(/```\n?/g, '').trim();
+        
+        res.json({
+            success: true,
+            modifiedCode: modifiedCode
+        });
+        
+    } catch (error) {
+        console.error('LP Modify Selection Error:', error);
+        res.status(500).json({
+            error: 'コード修正エラー',
+            message: error.message
+        });
+    }
+});
+
+// LP Builder - 画像生成API
+app.post('/api/image/generate', async (req, res) => {
+    try {
+        const clientStatus = getClientStatus();
+        if (!clientStatus.gemini) {
+            return res.status(400).json({ 
+                error: 'Gemini APIが初期化されていません',
+                message: 'GEMINI_API_KEYを.envに設定してください'
+            });
+        }
+        
+        const { prompt, size = '1024x1024' } = req.body;
+        
+        if (!prompt) {
+            return res.status(400).json({ error: 'promptが必要です' });
+        }
+        
+        console.log(`🎨 LP画像生成: "${prompt.substring(0, 50)}..."`);
+        
+        // サイズをパース
+        const [width, height] = size.split('x').map(Number);
+        const imageConfig = buildImageConfig(width || 1024, height || 1024);
+        
+        const generatedImages = await generateImageWithGemini(prompt, 1, [], imageConfig);
+        
+        if (generatedImages.length > 0) {
+            res.json({
+                success: true,
+                image: generatedImages[0] // Base64
+            });
+        } else {
+            res.status(500).json({
+                error: '画像生成に失敗しました'
+            });
+        }
+        
+    } catch (error) {
+        console.error('Image Generate Error:', error);
+        res.status(500).json({
+            error: '画像生成エラー',
             message: error.message
         });
     }

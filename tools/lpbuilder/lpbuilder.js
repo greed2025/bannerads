@@ -278,7 +278,18 @@ async function createNewProjectTab() {
  */
 async function loadActiveTabProject() {
     const activeTab = state.tabManager.getTabs().find(t => t.id === state.tabManager.activeTabId);
-    if (!activeTab || !activeTab.projectId) return;
+    if (!activeTab) return;
+    
+    // projectIdがない場合は新規プロジェクト作成
+    if (!activeTab.projectId) {
+        const newProject = createDefaultProject();
+        await saveProject(newProject);
+        activeTab.projectId = newProject.id;
+        state.currentProject = newProject;
+        loadProjectToEditors(newProject);
+        saveTabState();
+        return;
+    }
     
     const project = await loadProject(activeTab.projectId);
     if (project) {
@@ -604,7 +615,7 @@ function createDefaultProject() {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ランディングページ</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <header class="header">
@@ -634,7 +645,7 @@ function createDefaultProject() {
     </footer>
     
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-    <script src="script.js"></script>
+    <script src="js/script.js"></script>
 </body>
 </html>`,
             css: `/* ========================================
