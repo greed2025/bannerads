@@ -329,7 +329,7 @@ function renderProjectTabs() {
     
     tabList.innerHTML = tabs.map(tab => `
         <div class="project-tab ${tab.id === activeTabId ? 'active' : ''}" data-tab-id="${tab.id}">
-            <span class="project-tab-name" contenteditable="true" data-tab-id="${tab.id}" spellcheck="false">${escapeHtml(tab.name)}</span>
+            <span class="project-tab-name" data-tab-id="${tab.id}" spellcheck="false">${escapeHtml(tab.name)}</span>
             ${tab.isDirty ? '<span class="project-tab-dirty"></span>' : ''}
             <button class="project-tab-close" data-tab-id="${tab.id}">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -350,25 +350,41 @@ function renderProjectTabs() {
         tabEl.addEventListener('click', async (e) => {
             if (e.target.closest('.project-tab-close')) return;
             // 編集中はタブ切替しない
-            if (e.target.classList.contains('project-tab-name') && 
-                document.activeElement === e.target) return;
+            if (e.target.isContentEditable) return;
             
             const tabId = tabEl.dataset.tabId;
             await switchToTab(tabId);
         });
     });
     
-    // タブ名編集イベント
+    // タブ名ダブルクリックで編集モード
     tabList.querySelectorAll('.project-tab-name').forEach(nameEl => {
         const tabId = nameEl.dataset.tabId;
         
-        // フォーカス解除で保存
+        // ダブルクリックで編集開始
+        nameEl.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            nameEl.contentEditable = 'true';
+            nameEl.focus();
+            
+            // テキスト全選択
+            const range = document.createRange();
+            range.selectNodeContents(nameEl);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        });
+        
+        // フォーカス解除で保存＆編集モード終了
         nameEl.addEventListener('blur', async () => {
+            nameEl.contentEditable = 'false';
             await saveTabName(tabId, nameEl.textContent.trim());
         });
         
         // Enterで確定
         nameEl.addEventListener('keydown', (e) => {
+            if (!nameEl.isContentEditable) return;
+            
             if (e.key === 'Enter') {
                 e.preventDefault();
                 nameEl.blur();
