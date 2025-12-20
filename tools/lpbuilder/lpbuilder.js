@@ -1562,20 +1562,42 @@ function buildPreviewHtml() {
     }
     
     // CSSをインライン化（style.cssのlinkタグを置換）
+    const originalHtml = html;
     html = html.replace(
         /<link[^>]*href=["'][^"']*style\.css["'][^>]*>/gi,
         `<style>${css}</style>`
     );
+    
+    // linkタグがなかった場合は</head>の前に挿入
+    if (html === originalHtml && css) {
+        if (html.includes('</head>')) {
+            html = html.replace('</head>', `    <style>${css}</style>\n</head>`);
+        } else {
+            // headタグもない場合は先頭に追加
+            html = `<style>${css}</style>\n${html}`;
+        }
+    }
     
     // jQuery CDNをローカルバンドルに置換（プレビュー用）
     // 注: 実際にはjQueryのソースを埋め込む必要があるが、
     // プレビューでは外部読み込みを許可するためsandbox属性を調整
     
     // JSをインライン化（script.jsのscriptタグを置換）
+    const originalHtml2 = html;
     html = html.replace(
         /<script[^>]*src=["'][^"']*script\.js["'][^>]*><\/script>/gi,
         `<script>${js}</script>`
     );
+    
+    // scriptタグがなかった場合は</body>の前に挿入
+    if (html === originalHtml2 && js) {
+        if (html.includes('</body>')) {
+            html = html.replace('</body>', `    <script>${js}</script>\n</body>`);
+        } else {
+            // bodyタグもない場合は末尾に追加
+            html = `${html}\n<script>${js}</script>`;
+        }
+    }
     
     return html;
 }
