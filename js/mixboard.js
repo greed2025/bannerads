@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentTool = 'select';
     let zoomScale = 0.5;
     let activeGenerationCount = 0;
+    let activeGenerationBounds = [];
     
     // ドラッグ状態
     let isDragging = false;
@@ -1258,6 +1259,13 @@ document.addEventListener('DOMContentLoaded', () => {
             null,
             { width: displayWidth, height: placeholderHeight, label: '編集中...' }
         );
+        const placeholderBoundId = registerGenerationBounds({
+            x: newX,
+            y: newY,
+            width: displayWidth,
+            height: placeholderHeight
+        });
+        placeholder.dataset.boundId = placeholderBoundId;
         canvasContainer.appendChild(placeholder);
         updateEmptyState();
         closeRevisionMode();
@@ -1283,6 +1291,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 placeholder.style.width = displayWidth + 'px';
                 placeholder.style.height = displayHeight + 'px';
                 ensureCanvasSize(newX + displayWidth + 100, newY + displayHeight + 100);
+                updateGenerationBounds(placeholderBoundId, {
+                    width: displayWidth,
+                    height: displayHeight
+                });
             }
 
             const instructions = revisionsSnapshot.map((r, i) => 
@@ -1319,6 +1331,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('エラーが発生しました: ' + error.message, 'error');
         } finally {
             placeholder.remove();
+            unregisterGenerationBounds(placeholderBoundId);
             finishGeneration(1);
             if (saveBtn) {
                 saveBtn.textContent = originalText;
@@ -1607,6 +1620,22 @@ document.addEventListener('DOMContentLoaded', () => {
             .filter((bounds) => bounds.width > 0 && bounds.height > 0);
     }
 
+    function registerGenerationBounds(bounds) {
+        const id = `gb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        activeGenerationBounds.push({ id, ...bounds });
+        return id;
+    }
+
+    function updateGenerationBounds(id, bounds) {
+        const index = activeGenerationBounds.findIndex((item) => item.id === id);
+        if (index === -1) return;
+        activeGenerationBounds[index] = { ...activeGenerationBounds[index], ...bounds };
+    }
+
+    function unregisterGenerationBounds(id) {
+        activeGenerationBounds = activeGenerationBounds.filter((item) => item.id !== id);
+    }
+
     function isOverlapping(candidate, occupied, padding = 16) {
         return occupied.some((item) => {
             return !(
@@ -1651,7 +1680,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function buildPlacements(count, width, height) {
         const center = getViewportCenterOnCanvas();
-        const occupied = getOccupiedBounds();
+        const occupied = getOccupiedBounds().concat(
+            activeGenerationBounds.map(({ x, y, width: bWidth, height: bHeight }) => ({
+                x,
+                y,
+                width: bWidth,
+                height: bHeight
+            }))
+        );
         const placements = [];
 
         for (let i = 0; i < count; i += 1) {
@@ -1680,6 +1716,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function finishGeneration(count = 1) {
         activeGenerationCount = Math.max(0, activeGenerationCount - count);
         updateGenerationLoading();
+    }
+
+    function cleanupPlaceholders(placeholders) {
+        placeholders.forEach(({ el, boundId }) => {
+            el?.remove();
+            if (boundId) unregisterGenerationBounds(boundId);
+        });
     }
 
     async function sendGeneratorMessage() {
@@ -1714,6 +1757,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const placements = buildPlacements(batchCount, displayWidth, displayHeight);
         placements.forEach((placement, index) => {
             ensureCanvasSize(placement.x + displayWidth + 100, placement.y + displayHeight + 100);
+            const boundId = registerGenerationBounds({
+                x: placement.x,
+                y: placement.y,
+                width: displayWidth,
+                height: displayHeight
+            });
             const placeholder = createGeneratingPlaceholder(
                 'gen_' + Date.now() + '_' + index,
                 placement.x,
@@ -1721,8 +1770,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 index + 1,
                 { width: displayWidth, height: displayHeight }
             );
+            placeholder.dataset.boundId = boundId;
             canvasContainer.appendChild(placeholder);
-            placeholders.push(placeholder);
+            placeholders.push({ el: placeholder, boundId });
         });
         updateEmptyState();
         
@@ -1743,12 +1793,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const results = await Promise.all(requests);
             
             // プレースホルダーを削除
-            placeholders.forEach(p => p.remove());
+            cleanupPlaceholders(placeholders);
             
             // 成功した画像をキャンバスに追加
             let addedCount = 0;
             const placementQueue = placements.slice();
-            const occupiedBounds = getOccupiedBounds().concat(placements);
+            const occupiedBounds = getOccupiedBounds()
+                .concat(activeGenerationBounds.map(({ x, y, width: bWidth, height: bHeight }) => ({
+                    x,
+                    y,
+                    width: bWidth,
+                    height: bHeight
+                })))
+                .concat(placements);
             results.forEach((result) => {
                 if (result?.error) return;
                 const images = Array.isArray(result) ? result : [];
@@ -1780,7 +1837,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('Generator error:', error);
-            placeholders.forEach(p => p.remove());
+            cleanupPlaceholders(placeholders);
             showToast(error.message || '画像生成中にエラーが発生しました', 'error');
         } finally {
             finishGeneration(batchCount);
