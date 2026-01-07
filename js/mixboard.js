@@ -39,11 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const generatorSendBtn = document.getElementById('generatorSendBtn');
     const chatPlusBtn = document.getElementById('chatPlusBtn');
     
-    // 右パネルチャット（対話AI）
-    const chatInput = document.getElementById('chatInput');
-    const chatSendBtn = document.getElementById('chatSendBtn');
-    const chatMessages = document.getElementById('chatMessages');
-    
     // 修正モード
     const revisionOverlay = document.getElementById('revisionOverlay');
     const revisionCancelBtn = document.getElementById('revisionCancelBtn');
@@ -53,14 +48,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
     // 状態管理
     // ========================================
-    const API_BASE_URL = `${window.location.origin}/api`;
+    const API_CONFIG_KEY = 'bannerStudio.apiConfig';
+    const DEFAULT_API_CONFIG = {
+        provider: 'gemini',
+        apiBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+        apiKey: '',
+        model: 'gemini-3-pro-image-preview'
+    };
     const STORAGE_KEY = 'mixboard_project_v2';
     
     let elements = [];
     let selectedElementIds = []; // 複数選択対応
     let currentTool = 'select';
-    let zoomScale = 1;
-    let isGenerating = false;
+    let zoomScale = 0.5;
+    let activeGenerationCount = 0;
     
     // ドラッグ状態
     let isDragging = false;
@@ -101,6 +102,62 @@ document.addEventListener('DOMContentLoaded', () => {
     let historyStack = [];
     let historyIndex = -1;
     let isHistoryAction = false; // 履歴操作中フラグ
+
+    function loadApiConfig() {
+        const raw = localStorage.getItem(API_CONFIG_KEY);
+        if (raw) {
+            try {
+                const config = { ...DEFAULT_API_CONFIG, ...JSON.parse(raw) };
+                return sanitizeApiConfig(config);
+            } catch (error) {
+                return { ...DEFAULT_API_CONFIG };
+            }
+        }
+
+        const transferred = readApiConfigFromWindowName();
+        if (transferred) {
+            return sanitizeApiConfig(transferred);
+        }
+
+        return { ...DEFAULT_API_CONFIG };
+    }
+
+    function readApiConfigFromWindowName() {
+        if (!window.name) return null;
+        try {
+            const parsed = JSON.parse(window.name);
+            const transferred = parsed?.[API_CONFIG_KEY];
+            if (transferred?.apiKey) {
+                const config = { ...DEFAULT_API_CONFIG, ...transferred };
+                localStorage.setItem(API_CONFIG_KEY, JSON.stringify(config));
+                window.name = '';
+                return config;
+            }
+        } catch (error) {
+            return null;
+        }
+        return null;
+    }
+
+    function sanitizeApiConfig(config) {
+        if (!isLikelyGeminiKey(config.apiKey || '')) {
+            return { ...config, apiKey: '' };
+        }
+        return config;
+    }
+
+    function isLikelyGeminiKey(key) {
+        if (!key) return false;
+        if (key.includes('gemini-')) return false;
+        return key.startsWith('AIza');
+    }
+
+    function buildGeminiUrl(config) {
+        const baseUrl = (config.apiBaseUrl || DEFAULT_API_CONFIG.apiBaseUrl).replace(/\/$/, '');
+        const model = config.model || DEFAULT_API_CONFIG.model;
+        const apiKey = (config.apiKey || '').trim();
+        return `${baseUrl}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    }
     
     // ========================================
     // 初期化
@@ -109,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setupEventListeners();
         loadState();
         updateEmptyState();
+        setInitialView();
         
         // 履歴の初期状態を設定
         setTimeout(() => {
@@ -186,25 +244,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // Enterキーは送信せず、改行も防止（単一行入力）
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-            }
-        });
-        
-        // 右パネルチャット（対話AI）
-        chatSendBtn?.addEventListener('click', sendChatMessage);
-        let chatLastEnterTime = 0;
-        chatInput?.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                const now = Date.now();
-                if (now - chatLastEnterTime < 500) {
-                    // 2回目のEnter: 送信
-                    e.preventDefault();
-                    sendChatMessage();
-                    chatLastEnterTime = 0;
-                } else {
-                    // 1回目のEnter: 改行を許可しない、タイマー開始
-                    e.preventDefault();
-                    chatLastEnterTime = now;
-                }
             }
         });
         
@@ -480,18 +519,34 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
     // 要素追加
     // ========================================
-    function addImageElement(src, x, y, fadeIn = false) {
+    function addImageElement(src, x, y, fadeIn = false, meta = {}) {
         const id = 'img_' + Date.now();
+        const displayWidth = meta.displayWidth || 300;
+        let displayHeight = meta.displayHeight;
+        if (!displayHeight) {
+            if (meta.outputWidth && meta.outputHeight) {
+                displayHeight = Math.round(displayWidth * (meta.outputHeight / meta.outputWidth));
+            } else {
+                displayHeight = displayWidth;
+            }
+        }
         const element = {
             id,
             type: 'image',
             src,
             x,
             y,
-            width: 300,
+            width: displayWidth,
             zIndex: elements.length + 1,
             fadeIn
         };
+
+        if (meta.outputWidth && meta.outputHeight) {
+            element.outputWidth = meta.outputWidth;
+            element.outputHeight = meta.outputHeight;
+        }
+
+        ensureCanvasSize(x + displayWidth + 100, y + displayHeight + 100);
         
         elements.push(element);
         renderElement(element);
@@ -706,11 +761,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
     function selectElement(id, addToSelection = false) {
         if (!addToSelection) {
-            // 通常クリック：一つだけ選択
-            selectedElementIds = [id];
-            document.querySelectorAll('.canvas-element').forEach(el => {
-                el.classList.remove('selected');
-            });
+            // すでに複数選択中でその要素をクリックした場合は選択を保持
+            if (!(selectedElementIds.includes(id) && selectedElementIds.length > 1)) {
+                selectedElementIds = [id];
+                document.querySelectorAll('.canvas-element').forEach(el => {
+                    el.classList.remove('selected');
+                });
+            }
         } else {
             // Shift+クリック：選択に追加/削除
             const idx = selectedElementIds.indexOf(id);
@@ -748,7 +805,7 @@ document.addEventListener('DOMContentLoaded', () => {
             hideToolbars();
             if (previewBar) previewBar.style.display = 'none';
             if (generatorInput) {
-                generatorInput.placeholder = 'What do you want to create?';
+                generatorInput.placeholder = 'どんなバナーを作りますか？';
             }
             return;
         }
@@ -816,9 +873,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if (selectedImages.length === 1) {
-                generatorInput.placeholder = 'What do you want to change?';
+                generatorInput.placeholder = 'どの部分をどう変えますか？';
             } else {
-                generatorInput.placeholder = `${selectedImages.length}枚選択中 - どのように変更しますか？`;
+                generatorInput.placeholder = `${selectedImages.length}枚選択中 - どう変更しますか？`;
             }
         } else if (firstData && firstData.type === 'text') {
             showTextToolbar();
@@ -841,7 +898,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (previewBar) previewBar.style.display = 'none';
         
         if (generatorInput) {
-            generatorInput.placeholder = 'What do you want to create?';
+            generatorInput.placeholder = 'どんなバナーを作りますか？';
         }
     }
     
@@ -942,40 +999,47 @@ document.addEventListener('DOMContentLoaded', () => {
         saveState();
     }
     
-    function downloadElement() {
+    async function downloadElement() {
         if (selectedElementIds.length === 0) return;
-        
-        selectedElementIds.forEach((id, index) => {
+
+        for (const id of selectedElementIds) {
             const data = elements.find(e => e.id === id);
             if (data && data.type === 'image') {
-                // Base64をBlobに変換してダウンロード（プレビュー対応）
-                const base64 = data.src;
-                const mimeMatch = base64.match(/^data:([^;]+);base64,/);
-                const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
-                const extension = mimeType.split('/')[1] || 'png';
-                
-                // Base64デコード
-                const byteString = atob(base64.split(',')[1]);
-                const ab = new ArrayBuffer(byteString.length);
-                const ia = new Uint8Array(ab);
-                for (let i = 0; i < byteString.length; i++) {
-                    ia[i] = byteString.charCodeAt(i);
-                }
-                const blob = new Blob([ab], { type: mimeType });
-                
-                // Blob URLでダウンロード
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                // 簡易ID生成（5文字）
-                const shortId = Math.random().toString(36).substr(2, 5).toUpperCase();
-                link.download = `MAI適用_${shortId}.${extension}`;
-                link.href = url;
-                link.click();
-                
-                // URL解放
-                setTimeout(() => URL.revokeObjectURL(url), 100);
+                const targetSize = resolveDownloadSize(data);
+                await downloadImageSource(data.src, targetSize);
             }
-        });
+        }
+    }
+
+    function resolveDownloadSize(data) {
+        if (data.outputWidth && data.outputHeight) {
+            return { width: data.outputWidth, height: data.outputHeight };
+        }
+        if (generatorSize.width && generatorSize.height) {
+            return { width: generatorSize.width, height: generatorSize.height };
+        }
+        return null;
+    }
+
+    async function downloadImageSource(src, targetSize = null) {
+        try {
+            const dataUrl = await ensureDataUrl(src);
+            const resizedDataUrl = targetSize
+                ? await resizeImageTo(dataUrl, targetSize.width, targetSize.height)
+                : dataUrl;
+            const blob = dataUrlToBlob(resizedDataUrl);
+            const extension = blob.type.split('/')[1] || 'png';
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const shortId = Math.random().toString(36).substr(2, 5).toUpperCase();
+            const baseName = `${shortId}_MAI適応`;
+            link.download = `${baseName}.${extension}`;
+            link.href = url;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+        } catch (error) {
+            showToast('ダウンロードに失敗しました', 'error');
+        }
     }
     
     function deleteElement() {
@@ -1158,6 +1222,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const elementId = revisionOverlay.dataset.elementId;
         const data = elements.find(e => e.id === elementId);
         if (!data) return;
+
+        const config = loadApiConfig();
+        if (!config.apiKey) {
+            showToast('API設定が必要です', 'error');
+            return;
+        }
+
+        const revisionsSnapshot = currentRevisions.map((rev) => ({ ...rev }));
         
         // ローディング状態
         const saveBtn = document.getElementById('revisionSaveBtn');
@@ -1166,49 +1238,78 @@ document.addEventListener('DOMContentLoaded', () => {
             saveBtn.textContent = '編集中...';
             saveBtn.disabled = true;
         }
+
+        const revisionLayer = document.getElementById('revisionLayer');
+        const revisionDisplaySize = {
+            width: revisionLayer?.offsetWidth || 0,
+            height: revisionLayer?.offsetHeight || 0
+        };
+        const newX = data.x + data.width + 30;
+        const newY = data.y;
+        const displayWidth = Math.max(160, Math.round(data.width || 300));
+        const initialRatio = data.outputWidth && data.outputHeight
+            ? data.outputHeight / data.outputWidth
+            : 1;
+        const placeholderHeight = Math.max(120, Math.round(displayWidth * initialRatio));
+        const placeholder = createGeneratingPlaceholder(
+            'rev_' + Date.now(),
+            newX,
+            newY,
+            null,
+            { width: displayWidth, height: placeholderHeight, label: '編集中...' }
+        );
+        canvasContainer.appendChild(placeholder);
+        updateEmptyState();
+        closeRevisionMode();
+        startGeneration(1);
         
         try {
-            // 元画像に赤枠とコメントを描画した画像を作成
-            const annotatedImage = await createAnnotatedImage(data.src);
-            
-            // 修正指示のテキストを作成
-            const instructions = currentRevisions.map((r, i) => 
+            const [annotatedImage, sourceImage, dimensions] = await Promise.all([
+                createAnnotatedImage(data.src, revisionsSnapshot, revisionDisplaySize),
+                ensureDataUrl(data.src),
+                getImageDimensions(data.src)
+            ]);
+
+            let width = dimensions.width;
+            let height = dimensions.height;
+            if (!width || !height) {
+                const aspectRatio = await getImageAspectRatio(data.src);
+                width = Math.round(data.width || generatorSize.width);
+                height = Math.round(width * aspectRatio);
+            }
+
+            if (width && height) {
+                const displayHeight = Math.max(120, Math.round(displayWidth * (height / width)));
+                placeholder.style.width = displayWidth + 'px';
+                placeholder.style.height = displayHeight + 'px';
+                ensureCanvasSize(newX + displayWidth + 100, newY + displayHeight + 100);
+            }
+
+            const instructions = revisionsSnapshot.map((r, i) => 
                 `修正${i + 1}: ${r.comment}`
             ).join('\n');
-            
-            const prompt = `この画像には赤い枠とラベルで修正指示が描かれています。
-以下の修正を実行してください：
-${instructions}
 
-重要：修正後は赤い枠とラベルを完全に除去し、自然な画像として仕上げてください。
-枠とラベルは修正指示を示すためのもので、最終画像には含めないでください。`;
-            
-            const response = await fetch(`${API_BASE_URL}/mixboard/generate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: prompt,
-                    images: [annotatedImage, data.src],
-                    width: data.width,
-                    height: Math.round(data.width * (await getImageAspectRatio(data.src)))
-                })
+            const prompt = `この画像には赤い枠とラベルで修正指示が描かれています。\n` +
+                `以下の修正を実行してください：\n${instructions}\n\n` +
+                `重要：修正後は赤い枠とラベルを完全に除去し、自然な画像として仕上げてください。\n` +
+                `出力は1枚のみ、元画像と同じ縦横比・構図で作成し、画像を連結・分割しないでください。`;
+
+            const generatedImage = await requestImageEdit({
+                prompt,
+                annotatedImage,
+                sourceImage,
+                config,
+                width,
+                height
             });
-            
-            const result = await response.json();
-            
-            // 生成画像を取得
-            let generatedImage = result.generatedImages?.[0] || result.images?.[0] || 
-                                 result.generatedImage || result.imageData;
-            
+
             if (generatedImage) {
-                // 修正後の画像を元画像の右に新規追加
-                const newX = data.x + data.width + 30;
-                const newY = data.y;
-                
-                // 新しい画像要素として追加
-                addImageElement(generatedImage, newX, newY, true);
-                
-                closeRevisionMode();
+                addImageElement(generatedImage, newX, newY, true, {
+                    outputWidth: width,
+                    outputHeight: height,
+                    displayWidth
+                });
+
                 showToast('修正画像を追加しました（元の画像は保持されています）');
             } else {
                 showToast('画像の生成に失敗しました。再度お試しください。', 'error');
@@ -1217,6 +1318,8 @@ ${instructions}
             console.error('Revision save error:', error);
             showToast('エラーが発生しました: ' + error.message, 'error');
         } finally {
+            placeholder.remove();
+            finishGeneration(1);
             if (saveBtn) {
                 saveBtn.textContent = originalText;
                 saveBtn.disabled = false;
@@ -1224,8 +1327,7 @@ ${instructions}
         }
     }
     
-    // 修正指示付きの画像を作成
-    async function createAnnotatedImage(imageSrc) {
+    async function createAnnotatedImage(imageSrc, revisions = currentRevisions, displaySize = null) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.crossOrigin = 'anonymous';
@@ -1234,53 +1336,54 @@ ${instructions}
                 canvas.width = img.naturalWidth;
                 canvas.height = img.naturalHeight;
                 const ctx = canvas.getContext('2d');
-                
+
                 // 元画像を描画
                 ctx.drawImage(img, 0, 0);
-                
+
                 // 修正枠のスケール計算（表示サイズと実際のサイズの比率）
                 const revisionLayer = document.getElementById('revisionLayer');
-                const displayWidth = revisionLayer?.offsetWidth || img.naturalWidth;
-                const scaleX = img.naturalWidth / displayWidth;
-                const scaleY = img.naturalHeight / (revisionLayer?.offsetHeight || img.naturalHeight);
-                
+                const displayWidth = displaySize?.width || revisionLayer?.offsetWidth || img.naturalWidth;
+                const displayHeight = displaySize?.height || revisionLayer?.offsetHeight || img.naturalHeight;
+                const safeDisplayWidth = displayWidth || img.naturalWidth;
+                const safeDisplayHeight = displayHeight || img.naturalHeight;
+                const scaleX = img.naturalWidth / safeDisplayWidth;
+                const scaleY = img.naturalHeight / safeDisplayHeight;
+
                 // 各修正指示を描画
-                currentRevisions.forEach((rev, index) => {
+                revisions.forEach((rev, index) => {
                     const x = rev.x * scaleX;
                     const y = rev.y * scaleY;
                     const width = rev.width * scaleX;
                     const height = rev.height * scaleY;
-                    
+
                     // 赤枠を描画
-                    ctx.strokeStyle = rev.color;
+                    ctx.strokeStyle = rev.color || '#ef4444';
                     ctx.lineWidth = 4;
                     ctx.strokeRect(x, y, width, height);
-                    
-                    // ラベル背景（全文表示）
-                    ctx.fillStyle = rev.color;
+
+                    // ラベル背景
+                    ctx.fillStyle = rev.color || '#ef4444';
                     const labelText = `修正${index + 1}: ${rev.comment || ''}`;
                     ctx.font = 'bold 16px sans-serif';
                     const textMetrics = ctx.measureText(labelText);
                     const labelWidth = textMetrics.width + 16;
                     const labelHeight = 24;
                     const labelMargin = 6;
-                    
-                    // 上部で見切れる場合（y < 40）は下側に表示
-                    let labelY, textY;
-                    if (rev.y * scaleY < 40) {
+
+                    // 上部で見切れる場合は下側に表示
+                    let labelY;
+                    if (y < 40) {
                         labelY = y + height + labelMargin;
-                        textY = labelY + 17;
                     } else {
                         labelY = y - labelHeight - labelMargin;
-                        textY = y - labelMargin - 7;
                     }
-                    
+
                     ctx.fillRect(x, labelY, labelWidth, labelHeight);
-                    
+
                     // ラベルテキスト
                     ctx.fillStyle = 'white';
                     ctx.font = 'bold 14px sans-serif';
-                    ctx.fillText(labelText, x + 8, textY);
+                    ctx.fillText(labelText, x + 8, labelY + 17);
                 });
                 
                 resolve(canvas.toDataURL('image/png'));
@@ -1289,14 +1392,20 @@ ${instructions}
             img.src = imageSrc;
         });
     }
-    
-    // 画像のアスペクト比を取得
-    function getImageAspectRatio(imageSrc) {
+
+    function getImageDimensions(imageSrc) {
         return new Promise((resolve) => {
             const img = new Image();
-            img.onload = () => resolve(img.naturalHeight / img.naturalWidth);
-            img.onerror = () => resolve(1);
+            img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+            img.onerror = () => resolve({ width: 0, height: 0 });
             img.src = imageSrc;
+        });
+    }
+
+    function getImageAspectRatio(imageSrc) {
+        return getImageDimensions(imageSrc).then(({ width, height }) => {
+            if (!width || !height) return 1;
+            return height / width;
         });
     }
     
@@ -1335,32 +1444,258 @@ ${instructions}
             setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
+
+    function extractImages(data) {
+        if (!data?.candidates) return [];
+        const images = [];
+
+        data.candidates.forEach((candidate) => {
+            candidate.content?.parts?.forEach((part) => {
+                const inline = part.inline_data || part.inlineData;
+                if (inline?.data) {
+                    const mimeType = inline.mime_type || inline.mimeType || 'image/png';
+                    images.push(`data:${mimeType};base64,${inline.data}`);
+                }
+            });
+        });
+
+        return images;
+    }
+
+    function extractGeminiText(data) {
+        if (!data?.candidates) return '';
+        for (const candidate of data.candidates) {
+            const textPart = candidate.content?.parts?.find((part) => part.text);
+            if (textPart?.text) return textPart.text;
+        }
+        return '';
+    }
+
+    async function ensureDataUrl(src) {
+        if (src.startsWith('data:image')) return src;
+        const response = await fetch(src);
+        if (!response.ok) throw new Error('画像の取得に失敗しました');
+        const blob = await response.blob();
+        return blobToDataUrl(blob);
+    }
+
+    function dataUrlToBlob(dataUrl) {
+        const [header, base64] = dataUrl.split(',');
+        const match = header.match(/data:(.*);base64/);
+        const mime = match ? match[1] : 'image/png';
+        const binary = atob(base64);
+        const array = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+            array[i] = binary.charCodeAt(i);
+        }
+        return new Blob([array], { type: mime });
+    }
+
+    function dataUrlToInlineData(dataUrl) {
+        const [header, base64] = dataUrl.split(',');
+        const match = header.match(/data:(.*);base64/);
+        const mime = match ? match[1] : 'image/png';
+        return { mime_type: mime, data: base64 };
+    }
+
+    function resizeImageTo(dataUrl, targetWidth, targetHeight) {
+        if (!targetWidth || !targetHeight) return Promise.resolve(dataUrl);
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    resolve(dataUrl);
+                    return;
+                }
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                const scale = Math.max(targetWidth / img.naturalWidth, targetHeight / img.naturalHeight);
+                const drawWidth = img.naturalWidth * scale;
+                const drawHeight = img.naturalHeight * scale;
+                const offsetX = (targetWidth - drawWidth) / 2;
+                const offsetY = (targetHeight - drawHeight) / 2;
+                ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+                resolve(canvas.toDataURL('image/png'));
+            };
+            img.onerror = () => resolve(dataUrl);
+            img.src = dataUrl;
+        });
+    }
+
+    function blobToDataUrl(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
     
     // ========================================
     // ズーム
     // ========================================
-    function changeZoom(delta) {
-        zoomScale = Math.max(0.25, Math.min(2, zoomScale + delta));
+    function applyZoom(scale) {
+        zoomScale = Math.max(0.25, Math.min(2, scale));
         canvasContainer.style.transform = `scale(${zoomScale})`;
         canvasContainer.style.transformOrigin = 'center center';
-        
+
         if (zoomLevel) {
             zoomLevel.textContent = Math.round(zoomScale * 100) + '%';
         }
+    }
+
+    function centerCanvas() {
+        if (!canvasWrapper || !canvasContainer) return;
+        const maxScrollLeft = canvasWrapper.scrollWidth - canvasWrapper.clientWidth;
+        const maxScrollTop = canvasWrapper.scrollHeight - canvasWrapper.clientHeight;
+        canvasWrapper.scrollLeft = Math.max(0, Math.round(maxScrollLeft / 2));
+        canvasWrapper.scrollTop = Math.max(0, Math.round(maxScrollTop / 2));
+    }
+
+    function setInitialView() {
+        applyZoom(0.5);
+        requestAnimationFrame(() => {
+            centerCanvas();
+        });
+    }
+
+    function changeZoom(delta) {
+        applyZoom(zoomScale + delta);
     }
     
     // ========================================
     // チャット機能（画像生成）
     // ========================================
+    function getViewportCenterOnCanvas() {
+        if (!canvasWrapper || !canvasContainer) {
+            return { x: 0, y: 0 };
+        }
+        const wrapperRect = canvasWrapper.getBoundingClientRect();
+        const containerRect = canvasContainer.getBoundingClientRect();
+        const centerX = wrapperRect.left + wrapperRect.width / 2;
+        const centerY = wrapperRect.top + wrapperRect.height / 2;
+        return {
+            x: (centerX - containerRect.left) / zoomScale,
+            y: (centerY - containerRect.top) / zoomScale
+        };
+    }
+
+    function getElementBounds(element) {
+        const width = element.width || 0;
+        let height = 0;
+        if (element.outputWidth && element.outputHeight) {
+            height = Math.round(width * (element.outputHeight / element.outputWidth));
+        } else {
+            const img = document.querySelector(`[data-id="${element.id}"] img`);
+            if (img?.naturalWidth && img?.naturalHeight) {
+                height = Math.round(width * (img.naturalHeight / img.naturalWidth));
+            }
+        }
+        if (!height) height = width;
+        return { x: element.x, y: element.y, width, height };
+    }
+
+    function getOccupiedBounds() {
+        return elements
+            .filter((element) => element.type === 'image')
+            .map((element) => getElementBounds(element))
+            .filter((bounds) => bounds.width > 0 && bounds.height > 0);
+    }
+
+    function isOverlapping(candidate, occupied, padding = 16) {
+        return occupied.some((item) => {
+            return !(
+                candidate.x + candidate.width + padding <= item.x ||
+                candidate.x >= item.x + item.width + padding ||
+                candidate.y + candidate.height + padding <= item.y ||
+                candidate.y >= item.y + item.height + padding
+            );
+        });
+    }
+
+    function findPlacement(center, width, height, occupied) {
+        const gap = 40;
+        const stepX = width + gap;
+        const stepY = height + gap;
+        const maxRadius = 8;
+        const halfWidth = width / 2;
+        const halfHeight = height / 2;
+
+        for (let radius = 0; radius <= maxRadius; radius += 1) {
+            for (let dy = -radius; dy <= radius; dy += 1) {
+                for (let dx = -radius; dx <= radius; dx += 1) {
+                    if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+                    const x = Math.round(center.x + dx * stepX - halfWidth);
+                    const y = Math.round(center.y + dy * stepY - halfHeight);
+                    if (x < 0 || y < 0) continue;
+                    const candidate = { x, y, width, height };
+                    if (!isOverlapping(candidate, occupied)) {
+                        return candidate;
+                    }
+                }
+            }
+        }
+
+        return {
+            x: Math.max(0, Math.round(center.x - halfWidth)),
+            y: Math.max(0, Math.round(center.y - halfHeight)),
+            width,
+            height
+        };
+    }
+
+    function buildPlacements(count, width, height) {
+        const center = getViewportCenterOnCanvas();
+        const occupied = getOccupiedBounds();
+        const placements = [];
+
+        for (let i = 0; i < count; i += 1) {
+            const next = findPlacement(center, width, height, occupied);
+            placements.push(next);
+            occupied.push(next);
+        }
+
+        return placements;
+    }
+
+    function updateGenerationLoading() {
+        const bottomChatBar = document.getElementById('bottomChatBar');
+        if (activeGenerationCount > 0) {
+            bottomChatBar?.classList.add('loading');
+        } else {
+            bottomChatBar?.classList.remove('loading');
+        }
+    }
+
+    function startGeneration(count = 1) {
+        activeGenerationCount += count;
+        updateGenerationLoading();
+    }
+
+    function finishGeneration(count = 1) {
+        activeGenerationCount = Math.max(0, activeGenerationCount - count);
+        updateGenerationLoading();
+    }
+
     async function sendGeneratorMessage() {
         const text = generatorInput?.value.trim();
-        if (!text || isGenerating) return;
+        if (!text) return;
+
+        const config = loadApiConfig();
+        if (!config.apiKey) {
+            showToast('API設定が必要です', 'error');
+            return;
+        }
         
         generatorInput.value = '';
-        isGenerating = true;
-        
-        const bottomChatBar = document.getElementById('bottomChatBar');
-        bottomChatBar?.classList.add('loading');
+        const batchCount = generatorCount;
+        const batchSize = { ...generatorSize };
+        startGeneration(batchCount);
         
         // 選択中の画像を取得（複数対応）
         const selectedImages = [];
@@ -1370,40 +1705,41 @@ ${instructions}
                 selectedImages.push(data.src);
             }
         });
-        
+
         // generatorCount分のプレースホルダーを表示
         const placeholders = [];
-        for (let i = 0; i < generatorCount; i++) {
-            const col = i % 2;
-            const row = Math.floor(i / 2);
-            const x = 100 + col * 350;
-            const y = 100 + row * 350;
-            const placeholder = createGeneratingPlaceholder('gen_' + Date.now() + '_' + i, x, y, i + 1);
+        const displayWidth = 300;
+        const ratio = batchSize.width ? (batchSize.height / batchSize.width) : 1;
+        const displayHeight = Math.max(120, Math.round(displayWidth * ratio));
+        const placements = buildPlacements(batchCount, displayWidth, displayHeight);
+        placements.forEach((placement, index) => {
+            ensureCanvasSize(placement.x + displayWidth + 100, placement.y + displayHeight + 100);
+            const placeholder = createGeneratingPlaceholder(
+                'gen_' + Date.now() + '_' + index,
+                placement.x,
+                placement.y,
+                index + 1,
+                { width: displayWidth, height: displayHeight }
+            );
             canvasContainer.appendChild(placeholder);
             placeholders.push(placeholder);
-        }
+        });
         updateEmptyState();
         
         try {
-            // generatorCount分の並列リクエスト
             const requests = [];
-            for (let i = 0; i < generatorCount; i++) {
+            for (let i = 0; i < batchCount; i++) {
                 requests.push(
-                    fetch(`${API_BASE_URL}/mixboard/generate`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            prompt: text,
-                            images: selectedImages,
-                            count: 1,
-                            width: generatorSize.width,
-                            height: generatorSize.height
-                        })
-                    }).then(res => res.json()).then(result => ({ result, index: i }))
-                      .catch(err => ({ error: err, index: i }))
+                    requestImageGeneration({
+                        prompt: text,
+                        config,
+                        selectedImages,
+                        width: batchSize.width,
+                        height: batchSize.height
+                    }).catch(error => ({ error }))
                 );
             }
-            
+
             const results = await Promise.all(requests);
             
             // プレースホルダーを削除
@@ -1411,23 +1747,30 @@ ${instructions}
             
             // 成功した画像をキャンバスに追加
             let addedCount = 0;
-            results.forEach(({ result, error, index }) => {
-                if (error) return;
-                
-                let images = result.generatedImages || result.images || [];
-                if (result.generatedImage) images = [result.generatedImage];
-                if (result.imageData) images = [result.imageData];
-                
-                if (images.length > 0) {
-                    images.forEach((imgSrc) => {
-                        const col = addedCount % 2;
-                        const row = Math.floor(addedCount / 2);
-                        const x = 100 + col * 350;
-                        const y = 100 + row * 350;
-                        addImageElement(imgSrc, x, y, true);
-                        addedCount++;
+            const placementQueue = placements.slice();
+            const occupiedBounds = getOccupiedBounds().concat(placements);
+            results.forEach((result) => {
+                if (result?.error) return;
+                const images = Array.isArray(result) ? result : [];
+                images.forEach((imgSrc) => {
+                    let placement = placementQueue.shift();
+                    if (!placement) {
+                        placement = findPlacement(
+                            getViewportCenterOnCanvas(),
+                            displayWidth,
+                            displayHeight,
+                            occupiedBounds
+                        );
+                        occupiedBounds.push(placement);
+                    }
+                    addImageElement(imgSrc, placement.x, placement.y, true, {
+                        outputWidth: batchSize.width,
+                        outputHeight: batchSize.height,
+                        displayWidth,
+                        displayHeight
                     });
-                }
+                    addedCount++;
+                });
             });
             
             if (addedCount > 0) {
@@ -1438,62 +1781,130 @@ ${instructions}
         } catch (error) {
             console.error('Generator error:', error);
             placeholders.forEach(p => p.remove());
-            showToast('画像生成中にエラーが発生しました', 'error');
+            showToast(error.message || '画像生成中にエラーが発生しました', 'error');
         } finally {
-            isGenerating = false;
-            bottomChatBar?.classList.remove('loading');
+            finishGeneration(batchCount);
         }
     }
     
     // 生成中プレースホルダー作成
-    function createGeneratingPlaceholder(id, x = 150, y = 150, num = null) {
+    function createGeneratingPlaceholder(id, x = 150, y = 150, num = null, options = {}) {
+        const width = options.width || 300;
+        const height = options.height || 300;
+        const label = options.label || null;
         const placeholder = document.createElement('div');
         placeholder.id = id;
         placeholder.className = 'generating-placeholder';
         placeholder.style.left = x + 'px';
         placeholder.style.top = y + 'px';
-        placeholder.style.width = '300px';
-        placeholder.style.height = '300px';
+        placeholder.style.width = width + 'px';
+        placeholder.style.height = height + 'px';
+        const statusText = label || `生成中${num ? ` (${num})` : ''}...`;
         placeholder.innerHTML = `
             <div class="spinner"></div>
-            <span class="status-text">生成中${num ? ` (${num})` : ''}...</span>
+            <span class="status-text">${statusText}</span>
         `;
         return placeholder;
     }
-    
-    async function sendChatMessage() {
-        const text = chatInput?.value.trim();
-        if (!text) return;
-        
-        addChatMessage('user', text);
-        chatInput.value = '';
-        
-        try {
-            const response = await fetch(`${API_BASE_URL}/chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message: text,
-                    projectType: 'mixboard'
-                })
-            });
-            
-            const result = await response.json();
-            addChatMessage('assistant', result.message);
-        } catch (error) {
-            console.error('Chat error:', error);
-            addChatMessage('system', 'エラーが発生しました');
-        }
+
+    async function requestImageGeneration({ prompt, config, selectedImages, width, height }) {
+        const sizeHint = `サイズ: ${width}×${height}px`;
+        const finalPrompt = `${prompt}\n${sizeHint}`;
+        const imageDataUrls = await Promise.all((selectedImages || []).map(ensureDataUrl));
+
+        return requestGeminiImages({
+            prompt: finalPrompt,
+            config,
+            imageDataUrls,
+            targetWidth: width,
+            targetHeight: height
+        });
     }
-    
-    function addChatMessage(role, text) {
-        if (!chatMessages) return;
-        
-        const div = document.createElement('div');
-        div.className = `chat-message ${role}`;
-        div.innerHTML = `<div class="message-content"><p>${escapeHtml(text)}</p></div>`;
-        chatMessages.appendChild(div);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    async function requestImageEdit({ prompt, annotatedImage, sourceImage, config, width, height }) {
+        const sizeHint = width && height ? `サイズ: ${width}×${height}px` : '';
+        const finalPrompt = sizeHint ? `${prompt}\n${sizeHint}` : prompt;
+        const imageDataUrls = [annotatedImage, sourceImage].filter(Boolean);
+
+        const images = await requestGeminiImages({
+            prompt: finalPrompt,
+            config,
+            imageDataUrls,
+            targetWidth: width,
+            targetHeight: height
+        });
+
+        return images[0];
+    }
+
+    async function requestGeminiImages({ prompt, config, imageDataUrls, targetWidth, targetHeight }) {
+        const url = buildGeminiUrl(config);
+        const parts = [{ text: prompt }];
+
+        if (imageDataUrls?.length) {
+            imageDataUrls.forEach((dataUrl) => {
+                parts.push({ inline_data: dataUrlToInlineData(dataUrl) });
+            });
+        }
+
+        const basePayload = {
+            contents: [{ role: 'user', parts }]
+        };
+
+        let payload = {
+            ...basePayload,
+            generationConfig: { responseModalities: ['IMAGE'] }
+        };
+
+        let result = await postGeminiRequest(url, payload);
+
+        if (!result.ok && hasResponseModalitiesError(result.data)) {
+            payload = { ...basePayload };
+            result = await postGeminiRequest(url, payload);
+        }
+
+        if (!result.ok) {
+            const errorText = getGeminiErrorMessage(result.data);
+            throw new Error(errorText || 'Gemini APIの呼び出しに失敗しました');
+        }
+
+        const images = extractImages(result.data);
+        if (!images.length) {
+            const message = extractGeminiText(result.data);
+            throw new Error(message || '画像が返ってきませんでした');
+        }
+
+        if (targetWidth && targetHeight) {
+            return Promise.all(images.map((img) => resizeImageTo(img, targetWidth, targetHeight)));
+        }
+
+        return images;
+    }
+
+    async function postGeminiRequest(url, payload) {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        let data = null;
+        try {
+            data = await response.json();
+        } catch (error) {
+            data = null;
+        }
+
+        return { ok: response.ok, status: response.status, data };
+    }
+
+    function getGeminiErrorMessage(data) {
+        return data?.error?.message || data?.message || '';
+    }
+
+    function hasResponseModalitiesError(data) {
+        const message = getGeminiErrorMessage(data);
+        return message.includes('responseModalities') || message.includes('response_modalities');
     }
     
     // ========================================
@@ -1744,17 +2155,9 @@ ${instructions}
             setCurrentTool('hand');
         }
         
-        // T: テキストツール
+        // T: テキストツールは無効化
         if (e.key === 't' && !e.metaKey && !e.ctrlKey) {
-            const activeEl = document.activeElement;
-            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.contentEditable === 'true')) return;
-            setCurrentTool('text');
-        }
-        
-        // Cmd/Ctrl + D: 複製
-        if ((e.metaKey || e.ctrlKey) && e.key === 'd' && selectedElementIds.length > 0) {
-            e.preventDefault();
-            duplicateElement();
+            return;
         }
         
         // Cmd/Ctrl + Z: アンドゥ
@@ -1778,11 +2181,20 @@ ${instructions}
             canvasEmptyState.style.display = elements.length === 0 ? 'block' : 'none';
         }
     }
-    
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+
+    function ensureCanvasSize(minWidth, minHeight) {
+        if (!canvasContainer) return;
+        const safeWidth = Number.isFinite(minWidth) ? Math.ceil(minWidth) : 0;
+        const safeHeight = Number.isFinite(minHeight) ? Math.ceil(minHeight) : 0;
+        const nextWidth = Math.max(canvasContainer.offsetWidth, safeWidth);
+        const nextHeight = Math.max(canvasContainer.offsetHeight, safeHeight);
+
+        if (nextWidth > canvasContainer.offsetWidth) {
+            canvasContainer.style.width = nextWidth + 'px';
+        }
+        if (nextHeight > canvasContainer.offsetHeight) {
+            canvasContainer.style.height = nextHeight + 'px';
+        }
     }
     
     function saveState() {

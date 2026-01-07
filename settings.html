@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API設定</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/settings.css">
+</head>
+<body>
+    <div class="mixboard-app settings-app">
+        <header class="mixboard-header">
+            <div class="header-left">
+                <h1 class="settings-title">API設定</h1>
+            </div>
+            <div class="header-right">
+                <a class="btn btn-secondary" href="index.html">バナー作成へ戻る</a>
+            </div>
+        </header>
+
+        <main class="settings-main">
+            <section class="settings-card">
+                <div class="settings-head">
+                    <div>
+                        <h2>接続情報</h2>
+                        <p>GitHub Pagesで公開する場合は、自分専用のAPIキーを入力してください。</p>
+                    </div>
+                    <span class="status-badge" id="configStatus">未保存</span>
+                </div>
+
+                <form id="settingsForm" class="settings-form">
+                    <label class="field">
+                        <span>Gemini APIキー</span>
+                        <input id="apiKey" type="password" placeholder="AIza...">
+                    </label>
+
+                    <div class="form-actions">
+                        <button class="btn btn-secondary" id="testBtn" type="button">接続テスト</button>
+                        <button class="btn btn-primary" id="saveBtn" type="submit">保存する</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="settings-card note">
+                <h3>注意点</h3>
+                <ul>
+                    <li>APIキーはブラウザに保存されます。共有PCでは利用しないでください。</li>
+                    <li>Gemini APIはGoogle AI Studioのキーのみ対応します。</li>
+                    <li>使用モデルは <code>gemini-3-pro-image-preview</code> 固定です（画像生成対応が必要）。</li>
+                    <li>外部APIのCORS制約により、直接リクエストできない場合があります。</li>
+                </ul>
+            </section>
+        </main>
+    </div>
+
+    <div class="toast" id="toast" aria-live="polite"></div>
+
+    <script src="js/settings.js"></script>
+</body>
+</html>
