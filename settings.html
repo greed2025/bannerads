@@ -33,8 +33,16 @@
 
                 <form id="settingsForm" class="settings-form">
                     <label class="field">
-                        <span>Gemini APIキー</span>
-                        <input id="apiKey" type="password" placeholder="AIza...">
+                        <span>Gemini APIキー 1</span>
+                        <input id="apiKey1" type="password" placeholder="AIza...">
+                    </label>
+                    <label class="field">
+                        <span>Gemini APIキー 2</span>
+                        <input id="apiKey2" type="password" placeholder="AIza...">
+                    </label>
+                    <label class="field">
+                        <span>Gemini APIキー 3</span>
+                        <input id="apiKey3" type="password" placeholder="AIza...">
                     </label>
 
                     <div class="form-actions">
@@ -50,6 +58,7 @@
                     <li>APIキーはブラウザに保存されます。共有PCでは利用しないでください。</li>
                     <li>Gemini APIはGoogle AI Studioのキーのみ対応します。</li>
                     <li>使用モデルは <code>gemini-3-pro-image-preview</code> 固定です（画像生成対応が必要）。</li>
+                    <li>上限回避のため、別プロジェクト発行のキーを複数登録できます。</li>
                     <li>外部APIのCORS制約により、直接リクエストできない場合があります。</li>
                 </ul>
             </section>

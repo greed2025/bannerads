@@ -7,6 +7,9 @@ const DEFAULT_CONFIG = {
     provider: 'gemini',
     apiBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     apiKey: '',
+    apiKeys: [],
+    apiKeyIndex: 0,
+    lastKeyReset: '',
     model: 'gemini-3-pro-image-preview'
 };
 

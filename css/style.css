@@ -1431,6 +1431,4 @@ button {
     opacity: 0.85;
 }
 
-.bottom-chat-bar.loading .chat-send-btn svg {
-    animation: spin 1s linear infinite;
-}
+/* 送信ボタンは常に静的 */

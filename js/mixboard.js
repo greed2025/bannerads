@@ -53,6 +53,9 @@ document.addEventListener('DOMContentLoaded', () => {
         provider: 'gemini',
         apiBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
         apiKey: '',
+        apiKeys: [],
+        apiKeyIndex: 0,
+        lastKeyReset: '',
         model: 'gemini-3-pro-image-preview'
     };
     const STORAGE_KEY = 'mixboard_project_v2';
@@ -109,7 +112,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (raw) {
             try {
                 const config = { ...DEFAULT_API_CONFIG, ...JSON.parse(raw) };
-                return sanitizeApiConfig(config);
+                const sanitized = sanitizeApiConfig(config);
+                persistApiConfig(sanitized);
+                return sanitized;
             } catch (error) {
                 return { ...DEFAULT_API_CONFIG };
             }
@@ -117,7 +122,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const transferred = readApiConfigFromWindowName();
         if (transferred) {
-            return sanitizeApiConfig(transferred);
+            const sanitized = sanitizeApiConfig(transferred);
+            persistApiConfig(sanitized);
+            return sanitized;
         }
 
         return { ...DEFAULT_API_CONFIG };
@@ -128,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const parsed = JSON.parse(window.name);
             const transferred = parsed?.[API_CONFIG_KEY];
-            if (transferred?.apiKey) {
+            if (transferred?.apiKey || (Array.isArray(transferred?.apiKeys) && transferred.apiKeys.length > 0)) {
                 const config = { ...DEFAULT_API_CONFIG, ...transferred };
                 localStorage.setItem(API_CONFIG_KEY, JSON.stringify(config));
                 window.name = '';
@@ -141,10 +148,63 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function sanitizeApiConfig(config) {
-        if (!isLikelyGeminiKey(config.apiKey || '')) {
-            return { ...config, apiKey: '' };
+        const apiKeys = normalizeApiKeys(config);
+        const normalized = {
+            ...config,
+            apiKeys,
+            apiKey: apiKeys[0] || ''
+        };
+
+        if (!Number.isInteger(normalized.apiKeyIndex) || normalized.apiKeyIndex < 0) {
+            normalized.apiKeyIndex = 0;
+        }
+        if (normalized.apiKeyIndex >= apiKeys.length) {
+            normalized.apiKeyIndex = 0;
+        }
+
+        return applyDailyKeyReset(normalized);
+    }
+
+    function normalizeApiKeys(config) {
+        const candidates = [];
+        if (Array.isArray(config.apiKeys)) {
+            candidates.push(...config.apiKeys);
+        }
+        if (config.apiKey) {
+            candidates.push(config.apiKey);
+        }
+        return [...new Set(candidates.map((key) => key.trim()).filter(isLikelyGeminiKey))];
+    }
+
+    function applyDailyKeyReset(config) {
+        const today = getTodayString();
+        if (config.lastKeyReset !== today) {
+            config.lastKeyReset = today;
+            config.apiKeyIndex = 0;
+            config.apiKey = config.apiKeys[0] || '';
         }
         return config;
+    }
+
+    function ensureDailyKeyReset(config) {
+        const today = getTodayString();
+        if (config.lastKeyReset !== today) {
+            config.lastKeyReset = today;
+            config.apiKeyIndex = 0;
+            config.apiKey = config.apiKeys[0] || '';
+            persistApiConfig(config);
+        }
+    }
+
+    function persistApiConfig(config) {
+        try {
+            localStorage.setItem(API_CONFIG_KEY, JSON.stringify({
+                ...DEFAULT_API_CONFIG,
+                ...config
+            }));
+        } catch (error) {
+            // ignore
+        }
     }
 
     function isLikelyGeminiKey(key) {
@@ -153,11 +213,19 @@ document.addEventListener('DOMContentLoaded', () => {
         return key.startsWith('AIza');
     }
 
-    function buildGeminiUrl(config) {
+    function buildGeminiUrl(config, apiKeyOverride = '') {
         const baseUrl = (config.apiBaseUrl || DEFAULT_API_CONFIG.apiBaseUrl).replace(/\/$/, '');
         const model = config.model || DEFAULT_API_CONFIG.model;
-        const apiKey = (config.apiKey || '').trim();
+        const apiKey = (apiKeyOverride || config.apiKey || '').trim();
         return `${baseUrl}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    }
+
+    function getTodayString() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
     
     // ========================================
@@ -1895,7 +1963,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function requestGeminiImages({ prompt, config, imageDataUrls, targetWidth, targetHeight }) {
-        const url = buildGeminiUrl(config);
         const parts = [{ text: prompt }];
 
         if (imageDataUrls?.length) {
@@ -1908,34 +1975,61 @@ document.addEventListener('DOMContentLoaded', () => {
             contents: [{ role: 'user', parts }]
         };
 
-        let payload = {
-            ...basePayload,
-            generationConfig: { responseModalities: ['IMAGE'] }
-        };
+        ensureDailyKeyReset(config);
+        const apiKeys = Array.isArray(config.apiKeys) && config.apiKeys.length
+            ? config.apiKeys
+            : (config.apiKey ? [config.apiKey] : []);
 
-        let result = await postGeminiRequest(url, payload);
-
-        if (!result.ok && hasResponseModalitiesError(result.data)) {
-            payload = { ...basePayload };
-            result = await postGeminiRequest(url, payload);
+        if (!apiKeys.length) {
+            throw new Error('API設定が必要です');
         }
 
-        if (!result.ok) {
-            const errorText = getGeminiErrorMessage(result.data);
-            throw new Error(errorText || 'Gemini APIの呼び出しに失敗しました');
+        const startIndex = Math.min(config.apiKeyIndex || 0, apiKeys.length - 1);
+        let lastError = null;
+
+        for (let offset = 0; offset < apiKeys.length; offset += 1) {
+            const keyIndex = (startIndex + offset) % apiKeys.length;
+            const apiKey = apiKeys[keyIndex];
+            const url = buildGeminiUrl(config, apiKey);
+
+            let payload = {
+                ...basePayload,
+                generationConfig: { responseModalities: ['IMAGE'] }
+            };
+
+            let result = await postGeminiRequest(url, payload);
+
+            if (!result.ok && hasResponseModalitiesError(result.data)) {
+                payload = { ...basePayload };
+                result = await postGeminiRequest(url, payload);
+            }
+
+            if (!result.ok) {
+                lastError = getGeminiErrorMessage(result.data) || 'Gemini APIの呼び出しに失敗しました';
+                if (isQuotaError(result)) {
+                    continue;
+                }
+                throw new Error(lastError);
+            }
+
+            const images = extractImages(result.data);
+            if (!images.length) {
+                const message = extractGeminiText(result.data);
+                throw new Error(message || '画像が返ってきませんでした');
+            }
+
+            config.apiKeyIndex = keyIndex;
+            config.apiKey = apiKeys[keyIndex];
+            persistApiConfig(config);
+
+            if (targetWidth && targetHeight) {
+                return Promise.all(images.map((img) => resizeImageTo(img, targetWidth, targetHeight)));
+            }
+
+            return images;
         }
 
-        const images = extractImages(result.data);
-        if (!images.length) {
-            const message = extractGeminiText(result.data);
-            throw new Error(message || '画像が返ってきませんでした');
-        }
-
-        if (targetWidth && targetHeight) {
-            return Promise.all(images.map((img) => resizeImageTo(img, targetWidth, targetHeight)));
-        }
-
-        return images;
+        throw new Error(lastError || 'Gemini APIの呼び出しに失敗しました');
     }
 
     async function postGeminiRequest(url, payload) {
@@ -1962,6 +2056,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function hasResponseModalitiesError(data) {
         const message = getGeminiErrorMessage(data);
         return message.includes('responseModalities') || message.includes('response_modalities');
+    }
+
+    function isQuotaError(result) {
+        if (!result) return false;
+        if (result.status === 429 || result.status === 403) return true;
+        const message = (getGeminiErrorMessage(result.data) || '').toLowerCase();
+        return (
+            message.includes('quota') ||
+            message.includes('resource_exhausted') ||
+            message.includes('rate limit') ||
+            message.includes('rate_limit') ||
+            message.includes('exceeded')
+        );
     }
     
     // ========================================
