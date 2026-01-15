@@ -40,10 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatPlusBtn = document.getElementById('chatPlusBtn');
     
     // 修正モード
-    const revisionOverlay = document.getElementById('revisionOverlay');
-    const revisionCancelBtn = document.getElementById('revisionCancelBtn');
-    const revisionCancelBtn2 = document.getElementById('revisionCancelBtn2');
-    const revisionSaveBtn = document.getElementById('revisionSaveBtn');
+    const revisionOverlayTemplate = document.getElementById('revisionOverlayTemplate');
     
     // ========================================
     // 状態管理
@@ -316,28 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // 修正モード
-        revisionCancelBtn?.addEventListener('click', closeRevisionMode);
-        revisionCancelBtn2?.addEventListener('click', closeRevisionMode);
-        revisionSaveBtn?.addEventListener('click', saveRevision);
-        
-        // 修正モードの色パレット
-        document.querySelectorAll('.palette-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                // アクティブ状態を更新
-                document.querySelectorAll('.palette-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                
-                // 色を設定
-                const colorMap = {
-                    'red': '#ef4444',
-                    'green': '#22c55e',
-                    'blue': '#3b82f6',
-                    'yellow': '#eab308'
-                };
-                revisionColor = colorMap[btn.dataset.color] || '#ef4444';
-            });
-        });
+        // 修正モードのイベントはセッションごとに設定
         
         // 設定パネル
         setupSettingsPanel();
@@ -1115,6 +1091,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (selectedElementIds.length === 0) return;
         
         selectedElementIds.forEach(id => {
+            closeRevisionSession(id);
             const el = document.querySelector(`[data-id="${id}"]`);
             if (el) el.remove();
             elements = elements.filter(e => e.id !== id);
@@ -1128,121 +1105,281 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
     // 修正モード
     // ========================================
-    let currentRevisions = []; // 現在の修正指示 { x, y, width, height, color, comment }[]
-    let revisionColor = '#ef4444'; // 赤
+    const REVISION_DEFAULT_COLOR = '#ef4444';
+    const REVISION_COLOR_MAP = {
+        red: '#ef4444',
+        green: '#22c55e',
+        blue: '#3b82f6',
+        yellow: '#eab308'
+    };
+    const revisionSessions = new Map();
+    let activeRevisionElementId = null;
+    let revisionZIndex = 1000;
+    let revisionCascadeIndex = 0;
     
     function openRevisionMode(data) {
-        if (!revisionOverlay) return;
+        if (!revisionOverlayTemplate) return;
+        const existingSession = revisionSessions.get(data.id);
+        if (existingSession) {
+            focusRevisionSession(existingSession);
+            return;
+        }
         
-        const img = document.getElementById('revisionImage');
-        if (img) img.src = data.src;
-        
-        revisionOverlay.style.display = 'flex';
-        revisionOverlay.dataset.elementId = data.id;
-        currentRevisions = data.revisions ? [...data.revisions] : [];
-        
-        // 既存の修正枠を描画
-        renderRevisionBoxes();
-        
-        // 赤枠描画のイベント設定
-        setupRevisionDrawing();
+        const session = createRevisionSession(data);
+        if (!session) return;
+        revisionSessions.set(data.id, session);
+        focusRevisionSession(session);
     }
     
-    function setupRevisionDrawing() {
-        const revisionLayer = document.getElementById('revisionLayer');
+    function createRevisionSession(data) {
+        const templateRoot = revisionOverlayTemplate?.content?.firstElementChild;
+        if (!templateRoot) return null;
+        
+        const overlay = templateRoot.cloneNode(true);
+        overlay.dataset.elementId = data.id;
+        
+        const image = overlay.querySelector('[data-role="revision-image"]');
+        if (image) image.src = data.src;
+        
+        const session = {
+            elementId: data.id,
+            overlay,
+            image,
+            layer: overlay.querySelector('[data-role="revision-layer"]'),
+            saveBtn: overlay.querySelector('[data-action="revision-save"]'),
+            cancelBtns: overlay.querySelectorAll('[data-action="revision-cancel"]'),
+            paletteButtons: overlay.querySelectorAll('.palette-btn'),
+            revisions: data.revisions ? [...data.revisions] : [],
+            color: REVISION_DEFAULT_COLOR,
+            startX: 0,
+            startY: 0,
+            isDrawing: false,
+            tempBox: null,
+            listeners: {},
+            dragging: false,
+            dragOffset: { x: 0, y: 0 },
+            dragListeners: null
+        };
+        
+        session.cancelBtns.forEach((btn) => {
+            btn.addEventListener('click', () => closeRevisionSession(session));
+        });
+        session.saveBtn?.addEventListener('click', () => saveRevision(session));
+        overlay.addEventListener('pointerdown', () => focusRevisionSession(session));
+        
+        setupRevisionPalette(session);
+        setupRevisionDrag(session);
+        setupRevisionDrawing(session);
+        renderRevisionBoxes(session);
+        
+        document.body.appendChild(overlay);
+        positionRevisionOverlay(overlay);
+        
+        return session;
+    }
+    
+    function positionRevisionOverlay(overlay) {
+        const offset = 28 * (revisionCascadeIndex % 6);
+        revisionCascadeIndex += 1;
+        
+        const baseLeft = 24 + offset;
+        const baseTop = 24 + offset;
+        const maxLeft = Math.max(24, window.innerWidth - overlay.offsetWidth - 24);
+        const maxTop = Math.max(24, window.innerHeight - overlay.offsetHeight - 24);
+        overlay.style.left = Math.min(baseLeft, maxLeft) + 'px';
+        overlay.style.top = Math.min(baseTop, maxTop) + 'px';
+    }
+    
+    function focusRevisionSession(session) {
+        revisionZIndex += 1;
+        session.overlay.style.zIndex = revisionZIndex;
+        activeRevisionElementId = session.elementId;
+    }
+    
+    function setupRevisionPalette(session) {
+        const buttons = session.paletteButtons;
+        if (!buttons.length) return;
+        
+        buttons.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                buttons.forEach((b) => b.classList.remove('active'));
+                btn.classList.add('active');
+                session.color = REVISION_COLOR_MAP[btn.dataset.color] || REVISION_DEFAULT_COLOR;
+            });
+        });
+        
+        const activeBtn = Array.from(buttons).find((btn) => btn.classList.contains('active'));
+        session.color = REVISION_COLOR_MAP[activeBtn?.dataset.color] || REVISION_DEFAULT_COLOR;
+    }
+
+    function setupRevisionDrag(session) {
+        const header = session.overlay.querySelector('.revision-header');
+        if (!header) return;
+
+        const onPointerDown = (e) => {
+            if (e.target.closest('button')) return;
+            e.preventDefault();
+            focusRevisionSession(session);
+            session.dragging = true;
+            const rect = session.overlay.getBoundingClientRect();
+            session.dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            header.setPointerCapture(e.pointerId);
+        };
+
+        const onPointerMove = (e) => {
+            if (!session.dragging) return;
+            const nextLeft = e.clientX - session.dragOffset.x;
+            const nextTop = e.clientY - session.dragOffset.y;
+            const minLeft = 12;
+            const minTop = 12;
+            const maxLeft = Math.max(minLeft, window.innerWidth - session.overlay.offsetWidth - 12);
+            const maxTop = Math.max(minTop, window.innerHeight - session.overlay.offsetHeight - 12);
+            session.overlay.style.left = Math.min(Math.max(minLeft, nextLeft), maxLeft) + 'px';
+            session.overlay.style.top = Math.min(Math.max(minTop, nextTop), maxTop) + 'px';
+        };
+
+        const onPointerUp = (e) => {
+            if (!session.dragging) return;
+            session.dragging = false;
+            if (header.hasPointerCapture(e.pointerId)) {
+                header.releasePointerCapture(e.pointerId);
+            }
+        };
+
+        header.addEventListener('pointerdown', onPointerDown);
+        header.addEventListener('pointermove', onPointerMove);
+        header.addEventListener('pointerup', onPointerUp);
+        header.addEventListener('pointercancel', onPointerUp);
+
+        session.dragListeners = { header, onPointerDown, onPointerMove, onPointerUp };
+    }
+    
+    function setupRevisionDrawing(session) {
+        const revisionLayer = session.layer;
         if (!revisionLayer) return;
         
-        let isDrawing = false;
-        let startX = 0, startY = 0;
-        let tempBox = null;
-        
-        const onMouseDown = (e) => {
+        const onPointerDown = (e) => {
             if (e.target !== revisionLayer) return;
-            isDrawing = true;
+            focusRevisionSession(session);
+            session.isDrawing = true;
             const rect = revisionLayer.getBoundingClientRect();
-            startX = e.clientX - rect.left;
-            startY = e.clientY - rect.top;
+            session.startX = e.clientX - rect.left;
+            session.startY = e.clientY - rect.top;
             
-            tempBox = document.createElement('div');
-            tempBox.className = 'revision-box temp';
-            tempBox.style.borderColor = revisionColor;
-            tempBox.style.left = startX + 'px';
-            tempBox.style.top = startY + 'px';
-            revisionLayer.appendChild(tempBox);
+            session.tempBox = document.createElement('div');
+            session.tempBox.className = 'revision-box temp';
+            session.tempBox.style.borderColor = session.color;
+            session.tempBox.style.left = session.startX + 'px';
+            session.tempBox.style.top = session.startY + 'px';
+            revisionLayer.appendChild(session.tempBox);
+            revisionLayer.setPointerCapture(e.pointerId);
         };
         
-        const onMouseMove = (e) => {
-            if (!isDrawing || !tempBox) return;
+        const onPointerMove = (e) => {
+            if (!session.isDrawing || !session.tempBox) return;
             const rect = revisionLayer.getBoundingClientRect();
             const currentX = e.clientX - rect.left;
             const currentY = e.clientY - rect.top;
             
-            const width = Math.abs(currentX - startX);
-            const height = Math.abs(currentY - startY);
-            const left = Math.min(startX, currentX);
-            const top = Math.min(startY, currentY);
+            const width = Math.abs(currentX - session.startX);
+            const height = Math.abs(currentY - session.startY);
+            const left = Math.min(session.startX, currentX);
+            const top = Math.min(session.startY, currentY);
             
-            tempBox.style.left = left + 'px';
-            tempBox.style.top = top + 'px';
-            tempBox.style.width = width + 'px';
-            tempBox.style.height = height + 'px';
+            session.tempBox.style.left = left + 'px';
+            session.tempBox.style.top = top + 'px';
+            session.tempBox.style.width = width + 'px';
+            session.tempBox.style.height = height + 'px';
         };
         
-        const onMouseUp = (e) => {
-            if (!isDrawing || !tempBox) return;
-            isDrawing = false;
+        const onPointerUp = (e) => {
+            if (!session.isDrawing || !session.tempBox) return;
+            session.isDrawing = false;
             
             const rect = revisionLayer.getBoundingClientRect();
             const currentX = e.clientX - rect.left;
             const currentY = e.clientY - rect.top;
+            const width = Math.abs(currentX - session.startX);
+            const height = Math.abs(currentY - session.startY);
             
-            const width = Math.abs(currentX - startX);
-            const height = Math.abs(currentY - startY);
+            if (revisionLayer.hasPointerCapture(e.pointerId)) {
+                revisionLayer.releasePointerCapture(e.pointerId);
+            }
             
             // 最小サイズチェック
             if (width < 20 || height < 20) {
-                tempBox.remove();
-                tempBox = null;
+                session.tempBox.remove();
+                session.tempBox = null;
                 return;
             }
             
-            // コメント入力
             const comment = prompt('この部分への修正指示を入力してください:');
             if (!comment) {
-                tempBox.remove();
-                tempBox = null;
+                session.tempBox.remove();
+                session.tempBox = null;
                 return;
             }
             
             const revision = {
-                x: Math.min(startX, currentX),
-                y: Math.min(startY, currentY),
+                x: Math.min(session.startX, currentX),
+                y: Math.min(session.startY, currentY),
                 width,
                 height,
-                color: revisionColor,
+                color: session.color,
                 comment
             };
             
-            currentRevisions.push(revision);
-            tempBox.remove();
-            tempBox = null;
-            renderRevisionBoxes();
+            session.revisions.push(revision);
+            session.tempBox.remove();
+            session.tempBox = null;
+            renderRevisionBoxes(session);
         };
         
-        // イベントリスナー設定（既存のものを削除してから追加）
-        revisionLayer.onmousedown = onMouseDown;
-        document.onmousemove = onMouseMove;
-        document.onmouseup = onMouseUp;
+        const onPointerCancel = (e) => {
+            if (!session.isDrawing) return;
+            session.isDrawing = false;
+            if (revisionLayer.hasPointerCapture(e.pointerId)) {
+                revisionLayer.releasePointerCapture(e.pointerId);
+            }
+            if (session.tempBox) {
+                session.tempBox.remove();
+                session.tempBox = null;
+            }
+        };
+        
+        revisionLayer.addEventListener('pointerdown', onPointerDown);
+        revisionLayer.addEventListener('pointermove', onPointerMove);
+        revisionLayer.addEventListener('pointerup', onPointerUp);
+        revisionLayer.addEventListener('pointercancel', onPointerCancel);
+        
+        session.listeners = { onPointerDown, onPointerMove, onPointerUp, onPointerCancel };
     }
     
-    function renderRevisionBoxes() {
-        const revisionLayer = document.getElementById('revisionLayer');
+    function teardownRevisionDrawing(session) {
+        const revisionLayer = session.layer;
+        if (!revisionLayer || !session.listeners) return;
+        revisionLayer.removeEventListener('pointerdown', session.listeners.onPointerDown);
+        revisionLayer.removeEventListener('pointermove', session.listeners.onPointerMove);
+        revisionLayer.removeEventListener('pointerup', session.listeners.onPointerUp);
+        revisionLayer.removeEventListener('pointercancel', session.listeners.onPointerCancel);
+    }
+
+    function teardownRevisionDrag(session) {
+        const drag = session.dragListeners;
+        if (!drag?.header) return;
+        drag.header.removeEventListener('pointerdown', drag.onPointerDown);
+        drag.header.removeEventListener('pointermove', drag.onPointerMove);
+        drag.header.removeEventListener('pointerup', drag.onPointerUp);
+        drag.header.removeEventListener('pointercancel', drag.onPointerUp);
+    }
+    
+    function renderRevisionBoxes(session) {
+        const revisionLayer = session.layer;
         if (!revisionLayer) return;
         
-        // 既存のボックスをクリア
         revisionLayer.querySelectorAll('.revision-box:not(.temp)').forEach(el => el.remove());
         
-        currentRevisions.forEach((rev, index) => {
+        session.revisions.forEach((rev, index) => {
             const box = document.createElement('div');
             box.className = 'revision-box';
             box.style.left = rev.x + 'px';
@@ -1251,14 +1388,12 @@ document.addEventListener('DOMContentLoaded', () => {
             box.style.height = rev.height + 'px';
             box.style.borderColor = rev.color;
             
-            // ラベル（全文表示）
             const label = document.createElement('div');
             label.className = 'revision-label';
             label.style.background = rev.color;
             label.textContent = rev.comment || '';
             label.title = rev.comment;
             
-            // 上部で見切れる場合（y < 40px）は下側に表示
             if (rev.y < 40) {
                 label.style.bottom = 'auto';
                 label.style.top = 'calc(100% + 4px)';
@@ -1266,15 +1401,14 @@ document.addEventListener('DOMContentLoaded', () => {
             
             box.appendChild(label);
             
-            // 削除ボタン
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'rev-delete-btn';
             deleteBtn.style.borderColor = rev.color;
             deleteBtn.style.color = rev.color;
             deleteBtn.textContent = '×';
             deleteBtn.onclick = () => {
-                currentRevisions.splice(index, 1);
-                renderRevisionBoxes();
+                session.revisions.splice(index, 1);
+                renderRevisionBoxes(session);
             };
             box.appendChild(deleteBtn);
             
@@ -1282,14 +1416,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    async function saveRevision() {
-        if (currentRevisions.length === 0) {
+    async function saveRevision(session) {
+        if (!session || session.revisions.length === 0) {
             showToast('修正指示を追加してください（画像上をドラッグして範囲を指定）');
             return;
         }
         
-        const elementId = revisionOverlay.dataset.elementId;
-        const data = elements.find(e => e.id === elementId);
+        const data = elements.find(e => e.id === session.elementId);
         if (!data) return;
 
         const config = loadApiConfig();
@@ -1298,28 +1431,39 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const revisionsSnapshot = currentRevisions.map((rev) => ({ ...rev }));
+        const revisionsSnapshot = session.revisions.map((rev) => ({ ...rev }));
         
-        // ローディング状態
-        const saveBtn = document.getElementById('revisionSaveBtn');
-        const originalText = saveBtn?.textContent;
+        const saveBtn = session.saveBtn;
         if (saveBtn) {
             saveBtn.textContent = '編集中...';
             saveBtn.disabled = true;
         }
 
-        const revisionLayer = document.getElementById('revisionLayer');
+        const revisionLayer = session.layer;
         const revisionDisplaySize = {
             width: revisionLayer?.offsetWidth || 0,
             height: revisionLayer?.offsetHeight || 0
         };
-        const newX = data.x + data.width + 30;
-        const newY = data.y;
         const displayWidth = Math.max(160, Math.round(data.width || 300));
         const initialRatio = data.outputWidth && data.outputHeight
             ? data.outputHeight / data.outputWidth
             : 1;
         const placeholderHeight = Math.max(120, Math.round(displayWidth * initialRatio));
+        const preferredCenter = {
+            x: data.x + data.width + 30 + displayWidth / 2,
+            y: data.y + placeholderHeight / 2
+        };
+        const occupied = getOccupiedBounds().concat(
+            activeGenerationBounds.map(({ x, y, width: bWidth, height: bHeight }) => ({
+                x,
+                y,
+                width: bWidth,
+                height: bHeight
+            }))
+        );
+        const placement = findPlacement(preferredCenter, displayWidth, placeholderHeight, occupied);
+        const newX = placement.x;
+        const newY = placement.y;
         const placeholder = createGeneratingPlaceholder(
             'rev_' + Date.now(),
             newX,
@@ -1327,16 +1471,11 @@ document.addEventListener('DOMContentLoaded', () => {
             null,
             { width: displayWidth, height: placeholderHeight, label: '編集中...' }
         );
-        const placeholderBoundId = registerGenerationBounds({
-            x: newX,
-            y: newY,
-            width: displayWidth,
-            height: placeholderHeight
-        });
+        const placeholderBoundId = registerGenerationBounds(placement);
         placeholder.dataset.boundId = placeholderBoundId;
         canvasContainer.appendChild(placeholder);
         updateEmptyState();
-        closeRevisionMode();
+        closeRevisionSession(session);
         startGeneration(1);
         
         try {
@@ -1401,14 +1540,10 @@ document.addEventListener('DOMContentLoaded', () => {
             placeholder.remove();
             unregisterGenerationBounds(placeholderBoundId);
             finishGeneration(1);
-            if (saveBtn) {
-                saveBtn.textContent = originalText;
-                saveBtn.disabled = false;
-            }
         }
     }
     
-    async function createAnnotatedImage(imageSrc, revisions = currentRevisions, displaySize = null) {
+    async function createAnnotatedImage(imageSrc, revisions, displaySize = null) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.crossOrigin = 'anonymous';
@@ -1418,32 +1553,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 canvas.height = img.naturalHeight;
                 const ctx = canvas.getContext('2d');
 
-                // 元画像を描画
                 ctx.drawImage(img, 0, 0);
 
-                // 修正枠のスケール計算（表示サイズと実際のサイズの比率）
-                const revisionLayer = document.getElementById('revisionLayer');
-                const displayWidth = displaySize?.width || revisionLayer?.offsetWidth || img.naturalWidth;
-                const displayHeight = displaySize?.height || revisionLayer?.offsetHeight || img.naturalHeight;
+                const displayWidth = displaySize?.width || img.naturalWidth;
+                const displayHeight = displaySize?.height || img.naturalHeight;
                 const safeDisplayWidth = displayWidth || img.naturalWidth;
                 const safeDisplayHeight = displayHeight || img.naturalHeight;
                 const scaleX = img.naturalWidth / safeDisplayWidth;
                 const scaleY = img.naturalHeight / safeDisplayHeight;
 
-                // 各修正指示を描画
                 revisions.forEach((rev, index) => {
                     const x = rev.x * scaleX;
                     const y = rev.y * scaleY;
                     const width = rev.width * scaleX;
                     const height = rev.height * scaleY;
 
-                    // 赤枠を描画
-                    ctx.strokeStyle = rev.color || '#ef4444';
+                    ctx.strokeStyle = rev.color || REVISION_DEFAULT_COLOR;
                     ctx.lineWidth = 4;
                     ctx.strokeRect(x, y, width, height);
 
-                    // ラベル背景
-                    ctx.fillStyle = rev.color || '#ef4444';
+                    ctx.fillStyle = rev.color || REVISION_DEFAULT_COLOR;
                     const labelText = `修正${index + 1}: ${rev.comment || ''}`;
                     ctx.font = 'bold 16px sans-serif';
                     const textMetrics = ctx.measureText(labelText);
@@ -1451,7 +1580,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const labelHeight = 24;
                     const labelMargin = 6;
 
-                    // 上部で見切れる場合は下側に表示
                     let labelY;
                     if (y < 40) {
                         labelY = y + height + labelMargin;
@@ -1461,7 +1589,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     ctx.fillRect(x, labelY, labelWidth, labelHeight);
 
-                    // ラベルテキスト
                     ctx.fillStyle = 'white';
                     ctx.font = 'bold 14px sans-serif';
                     ctx.fillText(labelText, x + 8, labelY + 17);
@@ -1490,14 +1617,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    function closeRevisionMode() {
-        if (revisionOverlay) {
-            revisionOverlay.style.display = 'none';
-            currentRevisions = [];
-            // イベントリスナーをクリア
-            document.onmousemove = null;
-            document.onmouseup = null;
+    function closeRevisionSession(sessionOrElementId) {
+        const session = typeof sessionOrElementId === 'string'
+            ? revisionSessions.get(sessionOrElementId)
+            : sessionOrElementId;
+        if (!session) return;
+        teardownRevisionDrawing(session);
+        teardownRevisionDrag(session);
+        session.overlay.remove();
+        revisionSessions.delete(session.elementId);
+        if (activeRevisionElementId === session.elementId) {
+            const remaining = Array.from(revisionSessions.keys());
+            activeRevisionElementId = remaining.length ? remaining[remaining.length - 1] : null;
         }
+    }
+    
+    function closeActiveRevisionSession() {
+        if (revisionSessions.size === 0) return;
+        const session = activeRevisionElementId
+            ? revisionSessions.get(activeRevisionElementId)
+            : Array.from(revisionSessions.values()).pop();
+        if (session) closeRevisionSession(session);
     }
     
     // トースト通知
@@ -2302,8 +2442,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Escape で選択解除
         if (e.key === 'Escape') {
-            if (revisionOverlay?.style.display === 'flex') {
-                closeRevisionMode();
+            if (revisionSessions.size > 0) {
+                closeActiveRevisionSession();
             } else {
                 deselectAll();
             }

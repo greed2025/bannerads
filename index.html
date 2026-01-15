@@ -183,39 +183,41 @@
         </div>
     </div>
 
-    <!-- 修正モードオーバーレイ -->
-    <div class="revision-overlay" id="revisionOverlay" style="display: none;">
-        <div class="revision-container">
-            <div class="revision-header">
-                <h3>画像編集</h3>
-                <button class="cancel-btn" id="revisionCancelBtn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                    キャンセル
-                </button>
-            </div>
-            <div class="revision-content">
-                <div class="revision-image-wrapper" id="revisionImageWrapper">
-                    <img id="revisionImage" src="" alt="編集中">
-                    <div class="revision-layer" id="revisionLayer"></div>
+    <!-- 修正モードテンプレート -->
+    <template id="revisionOverlayTemplate">
+        <div class="revision-overlay">
+            <div class="revision-container">
+                <div class="revision-header">
+                    <h3>画像編集</h3>
+                    <button class="cancel-btn" data-action="revision-cancel">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                        キャンセル
+                    </button>
                 </div>
-            </div>
-            <div class="revision-tools">
-                <div class="color-palette">
-                    <button class="palette-btn active" data-color="red" style="background: #ff4d4d;"></button>
-                    <button class="palette-btn" data-color="green" style="background: #22c55e;"></button>
-                    <button class="palette-btn" data-color="blue" style="background: #3b82f6;"></button>
-                    <button class="palette-btn" data-color="yellow" style="background: #eab308;"></button>
+                <div class="revision-content">
+                    <div class="revision-image-wrapper">
+                        <img data-role="revision-image" src="" alt="編集中">
+                        <div class="revision-layer" data-role="revision-layer"></div>
+                    </div>
                 </div>
-            </div>
-            <div class="revision-footer">
-                <button class="btn btn-secondary" id="revisionCancelBtn2">キャンセル</button>
-                <button class="btn btn-primary" id="revisionSaveBtn">保存</button>
+                <div class="revision-tools">
+                    <div class="color-palette">
+                        <button class="palette-btn active" data-color="red" style="background: #ff4d4d;"></button>
+                        <button class="palette-btn" data-color="green" style="background: #22c55e;"></button>
+                        <button class="palette-btn" data-color="blue" style="background: #3b82f6;"></button>
+                        <button class="palette-btn" data-color="yellow" style="background: #eab308;"></button>
+                    </div>
+                </div>
+                <div class="revision-footer">
+                    <button class="btn btn-secondary" data-action="revision-cancel">キャンセル</button>
+                    <button class="btn btn-primary" data-action="revision-save">保存</button>
+                </div>
             </div>
         </div>
-    </div>
+    </template>
 
     <script src="js/mixboard.js"></script>
 </body>
