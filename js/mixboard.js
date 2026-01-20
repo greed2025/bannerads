@@ -1159,8 +1159,21 @@ document.addEventListener('DOMContentLoaded', () => {
             listeners: {},
             dragging: false,
             dragOffset: { x: 0, y: 0 },
-            dragListeners: null
+            dragListeners: null,
+            imageLoadHandler: null,
+            resizeHandler: null
         };
+
+        const syncSize = () => syncRevisionImageSize(session);
+        if (image) {
+            const onLoad = () => syncSize();
+            session.imageLoadHandler = onLoad;
+            image.addEventListener('load', onLoad);
+        }
+
+        const onResize = () => syncSize();
+        session.resizeHandler = onResize;
+        window.addEventListener('resize', onResize);
         
         session.cancelBtns.forEach((btn) => {
             btn.addEventListener('click', () => closeRevisionSession(session));
@@ -1175,6 +1188,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         document.body.appendChild(overlay);
         positionRevisionOverlay(overlay);
+        requestAnimationFrame(syncSize);
         
         return session;
     }
@@ -1190,11 +1204,74 @@ document.addEventListener('DOMContentLoaded', () => {
         overlay.style.left = Math.min(baseLeft, maxLeft) + 'px';
         overlay.style.top = Math.min(baseTop, maxTop) + 'px';
     }
+
+    function clampRevisionOverlayPosition(overlay) {
+        const currentLeft = parseFloat(overlay.style.left) || 0;
+        const currentTop = parseFloat(overlay.style.top) || 0;
+        const minLeft = 12;
+        const minTop = 12;
+        const maxLeft = Math.max(minLeft, window.innerWidth - overlay.offsetWidth - 12);
+        const maxTop = Math.max(minTop, window.innerHeight - overlay.offsetHeight - 12);
+        overlay.style.left = Math.min(Math.max(minLeft, currentLeft), maxLeft) + 'px';
+        overlay.style.top = Math.min(Math.max(minTop, currentTop), maxTop) + 'px';
+    }
     
     function focusRevisionSession(session) {
         revisionZIndex += 1;
         session.overlay.style.zIndex = revisionZIndex;
         activeRevisionElementId = session.elementId;
+    }
+
+    function syncRevisionImageSize(session) {
+        if (!session?.overlay || !session.image) return;
+        const overlay = session.overlay;
+        const content = overlay.querySelector('.revision-content');
+        const wrapper = overlay.querySelector('.revision-image-wrapper');
+        const header = overlay.querySelector('.revision-header');
+        const tools = overlay.querySelector('.revision-tools');
+        const footer = overlay.querySelector('.revision-footer');
+        if (!content || !wrapper) return;
+
+        const naturalWidth = session.image.naturalWidth;
+        const naturalHeight = session.image.naturalHeight;
+        if (!naturalWidth || !naturalHeight) return;
+
+        const margin = 24;
+        const sizeScale = 0.9;
+        const maxOverlayWidth = Math.max(1, window.innerWidth - margin * 2);
+        const maxOverlayHeight = Math.max(1, window.innerHeight - margin * 2);
+        const getChromeHeight = () =>
+            (header?.offsetHeight || 0) + (tools?.offsetHeight || 0) + (footer?.offsetHeight || 0);
+
+        let chromeHeight = getChromeHeight();
+        let maxImageHeight = Math.max(1, maxOverlayHeight - chromeHeight);
+        let scale = Math.min(maxOverlayWidth / naturalWidth, maxImageHeight / naturalHeight, 1) * sizeScale;
+        let displayWidth = Math.max(1, Math.round(naturalWidth * scale));
+        let displayHeight = Math.max(1, Math.round(naturalHeight * scale));
+
+        wrapper.style.width = displayWidth + 'px';
+        wrapper.style.height = displayHeight + 'px';
+        content.style.width = displayWidth + 'px';
+        content.style.height = displayHeight + 'px';
+        overlay.style.width = displayWidth + 'px';
+
+        const updatedChromeHeight = getChromeHeight();
+        if (updatedChromeHeight !== chromeHeight) {
+            chromeHeight = updatedChromeHeight;
+            maxImageHeight = Math.max(1, maxOverlayHeight - chromeHeight);
+            scale = Math.min(maxOverlayWidth / naturalWidth, maxImageHeight / naturalHeight, 1) * sizeScale;
+            displayWidth = Math.max(1, Math.round(naturalWidth * scale));
+            displayHeight = Math.max(1, Math.round(naturalHeight * scale));
+            wrapper.style.width = displayWidth + 'px';
+            wrapper.style.height = displayHeight + 'px';
+            content.style.width = displayWidth + 'px';
+            content.style.height = displayHeight + 'px';
+            overlay.style.width = displayWidth + 'px';
+        }
+
+        const overlayHeight = Math.min(maxOverlayHeight, chromeHeight + displayHeight);
+        overlay.style.height = overlayHeight + 'px';
+        clampRevisionOverlayPosition(overlay);
     }
     
     function setupRevisionPalette(session) {
@@ -1625,6 +1702,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!session) return;
         teardownRevisionDrawing(session);
         teardownRevisionDrag(session);
+        if (session.resizeHandler) {
+            window.removeEventListener('resize', session.resizeHandler);
+        }
+        if (session.image && session.imageLoadHandler) {
+            session.image.removeEventListener('load', session.imageLoadHandler);
+        }
         session.overlay.remove();
         revisionSessions.delete(session.elementId);
         if (activeRevisionElementId === session.elementId) {
