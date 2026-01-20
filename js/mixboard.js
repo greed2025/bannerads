@@ -1072,8 +1072,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const resizedDataUrl = targetSize
                 ? await resizeImageTo(dataUrl, targetSize.width, targetSize.height)
                 : dataUrl;
-            const blob = dataUrlToBlob(resizedDataUrl);
-            const extension = blob.type.split('/')[1] || 'png';
+            const outputDataUrl = await convertDataUrlToJpeg(resizedDataUrl);
+            const blob = dataUrlToBlob(outputDataUrl);
+            const extension = blob.type.split('/')[1] || 'jpeg';
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             const shortId = Math.random().toString(36).substr(2, 5).toUpperCase();
@@ -1717,6 +1718,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const match = header.match(/data:(.*);base64/);
         const mime = match ? match[1] : 'image/png';
         return { mime_type: mime, data: base64 };
+    }
+
+    function convertDataUrlToJpeg(dataUrl, quality = 0.92, background = '#fff') {
+        if (dataUrl.startsWith('data:image/jpeg')) {
+            return Promise.resolve(dataUrl);
+        }
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    reject(new Error('Canvasの初期化に失敗しました'));
+                    return;
+                }
+                ctx.fillStyle = background;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = () => reject(new Error('画像の変換に失敗しました'));
+            img.src = dataUrl;
+        });
     }
 
     function resizeImageTo(dataUrl, targetWidth, targetHeight) {
